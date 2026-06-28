@@ -9,6 +9,8 @@ import { decrypt } from "@/lib/auth";
 import { requirePermission, PERMISSIONS } from "@/lib/permissions";
 import User from "@/models/User";
 
+const VALID_ROLES = ["owner", "admin", "project_manager", "developer", "designer", "sales", "marketing", "finance", "client"] as const;
+
 const schema = z.object({
   name: z.string().min(2),
   email: z.email(),
@@ -31,21 +33,26 @@ export async function POST(request: NextRequest) {
       throw new ValidationError("Invalid input", { errors: z.prettifyError(parsed.error) });
     }
 
+    const role = parsed.data.role as (typeof VALID_ROLES)[number];
+    if (!VALID_ROLES.includes(role)) throw new ValidationError("Invalid role");
+
     await connectDB();
 
     const existing = await User.findOne({ email: parsed.data.email.toLowerCase(), organisationId: session.organisationId });
     if (existing) throw new ConflictError("Email already registered in this organisation");
 
     const passwordHash = await bcrypt.hash(parsed.data.password, 12);
-    const user = await User.create({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const userData: any = {
       email: parsed.data.email.toLowerCase(),
       passwordHash,
       name: parsed.data.name,
-      role: parsed.data.role,
+      role,
       organisationId: session.organisationId,
-    });
+    };
+    const doc = await User.create(userData);
 
-    return successResponse({ _id: user._id, name: user.name, email: user.email, role: user.role }, requestId, 201);
+    return successResponse({ _id: doc._id, name: doc.name, email: doc.email, role: doc.role }, requestId, 201);
   } catch (error) {
     return errorResponse(error, requestId);
   }
