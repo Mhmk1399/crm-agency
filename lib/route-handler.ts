@@ -1,16 +1,22 @@
 import { type NextRequest } from "next/server";
-import mongoose, { type Model, type Document } from "mongoose";
+import mongoose, { type Model } from "mongoose";
 import connectDB from "./db";
 import { type SessionPayload } from "./auth";
 import { successResponse, errorResponse } from "./api-response";
 import { generateRequestId } from "./correlation";
 import { AuthenticationError, NotFoundError, ValidationError } from "./errors";
-import { requirePermission, type Permission } from "./permissions";
+import {
+  buildPermission,
+  type AccessResourceId,
+  type Permission,
+} from "./permissions";
+import { requirePermission } from "./permission-store";
+import { createDataScopeResolver, mergeDataScope } from "./data-scope";
 import { createAuditLog } from "./audit";
 import logger from "./logger";
 
 interface CrudOptions {
-  model: () => Promise<Model<Document & Record<string, unknown>>>;
+  model: () => Promise<Model<unknown>>;
   modelName: string;
   permissions?: {
     list?: Permission;
@@ -23,6 +29,87 @@ interface CrudOptions {
   defaultSort?: Record<string, 1 | -1>;
   populateFields?: string[];
   sensitiveFields?: string[];
+}
+
+const MODEL_RESOURCE: Record<string, AccessResourceId> = {
+  ApprovalRequest: "approvals",
+  Board: "boards",
+  Client: "clients",
+  CompensationProfile: "compensation-profiles",
+  FinancialSnapshot: "financial-snapshots",
+  Invoice: "invoices",
+  Lead: "leads",
+  Notification: "notifications",
+  OperationalExpense: "operational-expenses",
+  Payment: "payments",
+  Project: "projects",
+  ProjectExpense: "project-expenses",
+  ProjectMember: "project-members",
+  ProjectMilestone: "project-milestones",
+  Proposal: "proposals",
+  Service: "services",
+  ServicePackage: "service-packages",
+  Task: "tasks",
+  TaskAttachment: "task-attachments",
+  TaskChecklist: "task-checklists",
+  TaskComment: "task-comments",
+  TeamMemberProfile: "team-member-profiles",
+  User: "users",
+};
+
+function inferredPermission(
+  modelName: string,
+  action: "view" | "post" | "update" | "delete"
+) {
+  const resource = MODEL_RESOURCE[modelName];
+  return resource ? buildPermission(resource, action) : undefined;
+}
+
+function isRecordWithId(value: unknown): value is { _id: unknown } {
+  return typeof value === "object" && value !== null && "_id" in value;
+}
+
+function formatError(error: unknown) {
+  if (error instanceof Error) {
+    return { errorName: error.name, errorMessage: error.message };
+  }
+  return { errorMessage: String(error) };
+}
+
+function sanitizeBodyForModel(Model: Model<unknown>, body: Record<string, unknown>) {
+  const cleaned: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(body)) {
+    const schemaType = Model.schema.path(key) as
+      | { instance?: string; caster?: { instance?: string } }
+      | undefined;
+
+    if (!schemaType) {
+      cleaned[key] = value;
+      continue;
+    }
+
+    if (isRecordWithId(value) && schemaType.instance === "ObjectId") {
+      cleaned[key] = value._id;
+      continue;
+    }
+
+    if (Array.isArray(value) && schemaType.instance === "Array") {
+      const casterType = schemaType.caster?.instance;
+      cleaned[key] = casterType === "ObjectId"
+        ? value.map((item) => (isRecordWithId(item) ? item._id : item)).filter((item) => item !== "")
+        : value;
+      continue;
+    }
+
+    if (value === "" && ["ObjectId", "Date"].includes(schemaType.instance ?? "")) {
+      continue;
+    }
+
+    cleaned[key] = value;
+  }
+
+  return cleaned;
 }
 
 async function authenticate(request: NextRequest): Promise<SessionPayload> {
@@ -53,22 +140,34 @@ export function createCrudHandlers(options: CrudOptions) {
     const requestId = generateRequestId();
     try {
       const session = await authenticate(request);
-      if (permissions?.list) requirePermission({ role: session.role, permission: permissions.list });
+      const permission = permissions?.list ?? inferredPermission(modelName, "view");
+      if (permission) await requirePermission({ role: session.role, organisationId: session.organisationId, permission });
 
       await connectDB();
       const Model = await getModel();
+      const getDataScope = createDataScopeResolver(session);
 
       const { page, limit, search, sort, order, status } = parseSearchParams(request.url);
       const skip = (page - 1) * limit;
 
-      const filter: Record<string, unknown> = { organisationId: new mongoose.Types.ObjectId(session.organisationId) };
+      const filter = mergeDataScope(
+        { organisationId: new mongoose.Types.ObjectId(session.organisationId) },
+        await getDataScope(modelName)
+      );
 
       if (status) filter.status = status;
 
       if (search && searchFields.length > 0) {
-        filter.$or = searchFields.map((f) => ({
+        const searchOr = searchFields.map((f) => ({
           [f]: { $regex: search, $options: "i" },
         }));
+
+        if (filter.$or) {
+          filter.$and = [{ $or: filter.$or }, { $or: searchOr }];
+          delete filter.$or;
+        } else {
+          filter.$or = searchOr;
+        }
       }
 
       const sortObj = sort ? { [sort]: order } : defaultSort;
@@ -94,12 +193,13 @@ export function createCrudHandlers(options: CrudOptions) {
     const requestId = generateRequestId();
     try {
       const session = await authenticate(request);
-      if (permissions?.create) requirePermission({ role: session.role, permission: permissions.create });
+      const permission = permissions?.create ?? inferredPermission(modelName, "post");
+      if (permission) await requirePermission({ role: session.role, organisationId: session.organisationId, permission });
 
       await connectDB();
       const Model = await getModel();
 
-      const body = await request.json();
+      const body = sanitizeBodyForModel(Model, await request.json());
       const uid = new mongoose.Types.ObjectId(session.userId);
       body.organisationId = new mongoose.Types.ObjectId(session.organisationId);
       if (!body.createdBy) body.createdBy = uid;
@@ -140,7 +240,7 @@ export function createCrudHandlers(options: CrudOptions) {
         return errorResponse(new ValidationError("Duplicate entry", (error as { keyValue?: Record<string, unknown> }).keyValue ?? {}), requestId);
       }
       const msg = error instanceof Error ? error.message : String(error);
-      logger.error(`${modelName}.create failed: ${msg}`, { requestId, errorCode: (error as { code?: string }).code });
+      logger.error(`${modelName}.create failed: ${msg}`, { requestId, errorCode: (error as { code?: string }).code, ...formatError(error) });
       return errorResponse(error, requestId);
     }
   }
@@ -155,16 +255,22 @@ export function createDetailHandlers(options: CrudOptions) {
     const requestId = generateRequestId();
     try {
       const session = await authenticate(request);
-      if (permissions?.get) requirePermission({ role: session.role, permission: permissions.get });
+      const permission = permissions?.get ?? inferredPermission(modelName, "view");
+      if (permission) await requirePermission({ role: session.role, organisationId: session.organisationId, permission });
 
       await connectDB();
       const Model = await getModel();
+      const getDataScope = createDataScopeResolver(session);
       const { id } = await params;
+      const filter = mergeDataScope(
+        {
+          _id: new mongoose.Types.ObjectId(id),
+          organisationId: new mongoose.Types.ObjectId(session.organisationId),
+        },
+        await getDataScope(modelName)
+      );
 
-      let query = Model.findOne({
-        _id: new mongoose.Types.ObjectId(id),
-        organisationId: new mongoose.Types.ObjectId(session.organisationId),
-      });
+      let query = Model.findOne(filter);
 
       for (const field of populateFields) {
         query = query.populate(field, "name email");
@@ -184,25 +290,32 @@ export function createDetailHandlers(options: CrudOptions) {
     const requestId = generateRequestId();
     try {
       const session = await authenticate(request);
-      if (permissions?.update) requirePermission({ role: session.role, permission: permissions.update });
+      const permission = permissions?.update ?? inferredPermission(modelName, "update");
+      if (permission) await requirePermission({ role: session.role, organisationId: session.organisationId, permission });
 
       await connectDB();
       const Model = await getModel();
+      const getDataScope = createDataScopeResolver(session);
       const { id } = await params;
-      const body = await request.json();
+      const body = sanitizeBodyForModel(Model, await request.json());
 
       delete body.organisationId;
       delete body._id;
 
-      const prev = await Model.findOne({
-        _id: new mongoose.Types.ObjectId(id),
-        organisationId: new mongoose.Types.ObjectId(session.organisationId),
-      }).lean();
+      const filter = mergeDataScope(
+        {
+          _id: new mongoose.Types.ObjectId(id),
+          organisationId: new mongoose.Types.ObjectId(session.organisationId),
+        },
+        await getDataScope(modelName)
+      );
+
+      const prev = await Model.findOne(filter).lean();
 
       if (!prev) throw new NotFoundError(modelName, id);
 
       const doc = await Model.findOneAndUpdate(
-        { _id: new mongoose.Types.ObjectId(id), organisationId: new mongoose.Types.ObjectId(session.organisationId) },
+        filter,
         { $set: body },
         { new: true, runValidators: true }
       ).lean();
@@ -222,7 +335,7 @@ export function createDetailHandlers(options: CrudOptions) {
 
       return successResponse(doc, requestId);
     } catch (error) {
-      logger.error(`${modelName}.update failed`, { requestId });
+      logger.error(`${modelName}.update failed`, { requestId, errorCode: (error as { code?: string }).code, ...formatError(error) });
       return errorResponse(error, requestId);
     }
   }
@@ -231,16 +344,23 @@ export function createDetailHandlers(options: CrudOptions) {
     const requestId = generateRequestId();
     try {
       const session = await authenticate(request);
-      if (permissions?.delete) requirePermission({ role: session.role, permission: permissions.delete });
+      const permission = permissions?.delete ?? inferredPermission(modelName, "delete");
+      if (permission) await requirePermission({ role: session.role, organisationId: session.organisationId, permission });
 
       await connectDB();
       const Model = await getModel();
+      const getDataScope = createDataScopeResolver(session);
       const { id } = await params;
 
-      const doc = await Model.findOneAndDelete({
-        _id: new mongoose.Types.ObjectId(id),
-        organisationId: new mongoose.Types.ObjectId(session.organisationId),
-      }).lean();
+      const doc = await Model.findOneAndDelete(
+        mergeDataScope(
+          {
+            _id: new mongoose.Types.ObjectId(id),
+            organisationId: new mongoose.Types.ObjectId(session.organisationId),
+          },
+          await getDataScope(modelName)
+        )
+      ).lean();
 
       if (!doc) throw new NotFoundError(modelName, id);
 

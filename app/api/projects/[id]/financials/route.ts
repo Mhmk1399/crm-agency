@@ -4,8 +4,10 @@ import connectDB from "@/lib/db";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { generateRequestId } from "@/lib/correlation";
 import { AuthenticationError, NotFoundError } from "@/lib/errors";
-import { requirePermission, PERMISSIONS } from "@/lib/permissions";
+import { PERMISSIONS } from "@/lib/permissions";
+import { requirePermission } from "@/lib/permission-store";
 import { decrypt } from "@/lib/auth";
+import { createDataScopeResolver, mergeDataScope } from "@/lib/data-scope";
 import * as money from "@/lib/money";
 import Project from "@/models/Project";
 import Task from "@/models/Task";
@@ -19,27 +21,36 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!token) throw new AuthenticationError();
     const session = await decrypt(token);
     if (!session) throw new AuthenticationError();
-    requirePermission({ role: session.role, permission: PERMISSIONS.PROJECT_VIEW_FINANCE });
+    await requirePermission({ role: session.role, organisationId: session.organisationId, permission: PERMISSIONS.PROJECT_EXPENSES_VIEW });
 
     await connectDB();
     const { id } = await params;
     const orgId = new mongoose.Types.ObjectId(session.organisationId);
     const projectId = new mongoose.Types.ObjectId(id);
+    const getDataScope = createDataScopeResolver(session);
+    const [projectScope, taskScope, expenseScope, invoiceScope] = await Promise.all([
+      getDataScope("Project"),
+      getDataScope("Task"),
+      getDataScope("ProjectExpense"),
+      getDataScope("Invoice"),
+    ]);
 
-    const project = await Project.findOne({ _id: projectId, organisationId: orgId }).lean();
+    const project = await Project.findOne(
+      mergeDataScope({ _id: projectId, organisationId: orgId }, projectScope)
+    ).lean();
     if (!project) throw new NotFoundError("Project", id);
 
     const [taskStats, expenses, invoices] = await Promise.all([
       Task.aggregate([
-        { $match: { organisationId: orgId, projectId } },
+        { $match: mergeDataScope({ organisationId: orgId, projectId }, taskScope) },
         { $group: { _id: null, totalMinutes: { $sum: "$actualMinutes" }, totalCost: { $sum: "$actualCost" }, billableMinutes: { $sum: { $cond: ["$isBillable", "$actualMinutes", 0] } } } },
       ]),
       ProjectExpense.aggregate([
-        { $match: { organisationId: orgId, projectId, isApproved: true } },
+        { $match: mergeDataScope({ organisationId: orgId, projectId, isApproved: true }, expenseScope) },
         { $group: { _id: null, totalExpenses: { $sum: "$amount" } } },
       ]),
       Invoice.aggregate([
-        { $match: { organisationId: orgId, projectId } },
+        { $match: mergeDataScope({ organisationId: orgId, projectId }, invoiceScope) },
         { $group: { _id: null, invoiced: { $sum: "$total" }, paid: { $sum: "$paidAmount" }, outstanding: { $sum: "$outstandingAmount" } } },
       ]),
     ]);

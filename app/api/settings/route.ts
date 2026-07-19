@@ -5,7 +5,8 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 import { generateRequestId } from "@/lib/correlation";
 import { AuthenticationError } from "@/lib/errors";
 import { decrypt } from "@/lib/auth";
-import { requirePermission, PERMISSIONS } from "@/lib/permissions";
+import { PERMISSIONS } from "@/lib/permissions";
+import { requirePermission } from "@/lib/permission-store";
 import Organisation from "@/models/Organisation";
 
 export async function GET(request: NextRequest) {
@@ -15,6 +16,7 @@ export async function GET(request: NextRequest) {
     if (!token) throw new AuthenticationError();
     const session = await decrypt(token);
     if (!session) throw new AuthenticationError();
+    await requirePermission({ role: session.role, organisationId: session.organisationId, permission: PERMISSIONS.SETTINGS_VIEW });
 
     await connectDB();
     const org = await Organisation.findById(session.organisationId).lean();
@@ -33,7 +35,7 @@ export async function PATCH(request: NextRequest) {
     if (!token) throw new AuthenticationError();
     const session = await decrypt(token);
     if (!session) throw new AuthenticationError();
-    requirePermission({ role: session.role, permission: PERMISSIONS.ORGANISATION_MANAGE });
+    await requirePermission({ role: session.role, organisationId: session.organisationId, permission: PERMISSIONS.SETTINGS_UPDATE });
 
     await connectDB();
     const body = await request.json();

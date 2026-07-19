@@ -1,52 +1,5 @@
-import { AuthorizationError } from "./errors";
-
-export const PERMISSIONS = {
-  ORGANISATION_MANAGE: "organisation.manage",
-  TEAM_VIEW: "team.view",
-  TEAM_MANAGE: "team.manage",
-  SALARY_VIEW: "salary.view",
-  SALARY_MANAGE: "salary.manage",
-
-  LEAD_CREATE: "lead.create",
-  LEAD_VIEW: "lead.view",
-  LEAD_UPDATE: "lead.update",
-  LEAD_ASSIGN: "lead.assign",
-  LEAD_CONVERT: "lead.convert",
-
-  PROPOSAL_CREATE: "proposal.create",
-  PROPOSAL_SEND: "proposal.send",
-  PROPOSAL_APPROVE: "proposal.approve",
-
-  PROJECT_CREATE: "project.create",
-  PROJECT_VIEW: "project.view",
-  PROJECT_UPDATE: "project.update",
-  PROJECT_ARCHIVE: "project.archive",
-  PROJECT_VIEW_FINANCE: "project.view_finance",
-
-  TASK_CREATE: "task.create",
-  TASK_ASSIGN: "task.assign",
-  TASK_UPDATE: "task.update",
-  TASK_REVIEW: "task.review",
-  TASK_DELETE: "task.delete",
-
-  TIME_CREATE: "time.create",
-  TIME_APPROVE: "time.approve",
-
-  FINANCE_VIEW: "finance.view",
-  FINANCE_MANAGE: "finance.manage",
-  INVOICE_CREATE: "invoice.create",
-  INVOICE_APPROVE: "invoice.approve",
-  PAYMENT_RECORD: "payment.record",
-
-  CAMPAIGN_CREATE: "campaign.create",
-  CAMPAIGN_APPROVE: "campaign.approve",
-  CAMPAIGN_PUBLISH: "campaign.publish",
-
-  REPORT_VIEW: "report.view",
-  AUDIT_VIEW: "audit.view",
-} as const;
-
-export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+export const ACTIONS = ["view", "post", "update", "delete"] as const;
+export type AccessAction = (typeof ACTIONS)[number];
 
 export const ROLES = {
   OWNER: "owner",
@@ -62,76 +15,180 @@ export const ROLES = {
 
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 
+export const ROLE_OPTIONS: { value: Role; label: string }[] = [
+  { value: ROLES.OWNER, label: "Owner" },
+  { value: ROLES.ADMIN, label: "Admin" },
+  { value: ROLES.PROJECT_MANAGER, label: "Project Manager" },
+  { value: ROLES.DEVELOPER, label: "Developer" },
+  { value: ROLES.DESIGNER, label: "Designer" },
+  { value: ROLES.SALES, label: "Sales" },
+  { value: ROLES.MARKETING, label: "Marketing" },
+  { value: ROLES.FINANCE, label: "Finance" },
+  { value: ROLES.CLIENT, label: "Client" },
+];
+
+export const GLOBAL_DASHBOARD_ROLES: Role[] = [ROLES.OWNER, ROLES.ADMIN];
+export const MEMBER_DASHBOARD_TAB_IDS = ["dashboard", "my-work", "tasks", "finance", "team", "profile"] as const;
+
+export function hasGlobalDashboardAccess(role: string): role is typeof GLOBAL_DASHBOARD_ROLES[number] {
+  return GLOBAL_DASHBOARD_ROLES.includes(role as Role);
+}
+
+export const ACCESS_RESOURCES = [
+  { id: "dashboard", label: "Dashboard", group: "Navigation" },
+  { id: "leads", label: "Leads", group: "CRM" },
+  { id: "clients", label: "Clients", group: "CRM" },
+  { id: "proposals", label: "Proposals", group: "CRM" },
+  { id: "projects", label: "Projects", group: "Delivery" },
+  { id: "tasks", label: "Tasks", group: "Delivery" },
+  { id: "project-milestones", label: "Project Milestones", group: "Delivery" },
+  { id: "project-members", label: "Project Members", group: "Delivery" },
+  { id: "project-expenses", label: "Project Expenses", group: "Finance" },
+  { id: "finance", label: "Finance Tab", group: "Finance" },
+  { id: "invoices", label: "Invoices", group: "Finance" },
+  { id: "payments", label: "Payments", group: "Finance" },
+  { id: "operational-expenses", label: "Operational Expenses", group: "Finance" },
+  { id: "financial-snapshots", label: "Financial Snapshots", group: "Finance" },
+  { id: "team", label: "Team Tab", group: "Team" },
+  { id: "users", label: "Users", group: "Team" },
+  { id: "team-member-profiles", label: "Member Profiles", group: "Team" },
+  { id: "compensation-profiles", label: "Compensation", group: "Team" },
+  { id: "settings", label: "Settings", group: "System" },
+  { id: "access", label: "Access Manager", group: "System" },
+  { id: "reports", label: "Reports", group: "System" },
+  { id: "approvals", label: "Approvals", group: "System" },
+  { id: "boards", label: "Boards", group: "System" },
+  { id: "services", label: "Services", group: "System" },
+  { id: "service-packages", label: "Service Packages", group: "System" },
+  { id: "notifications", label: "Notifications", group: "System" },
+  { id: "task-comments", label: "Task Comments", group: "Tasks" },
+  { id: "task-checklists", label: "Task Checklists", group: "Tasks" },
+  { id: "task-attachments", label: "Task Attachments", group: "Tasks" },
+] as const;
+
+export type AccessResourceId = (typeof ACCESS_RESOURCES)[number]["id"];
+export type Permission = `${AccessResourceId}.${AccessAction}`;
+
+export function buildPermission(
+  resource: AccessResourceId,
+  action: AccessAction
+): Permission {
+  return `${resource}.${action}` as Permission;
+}
+
+export const ALL_PERMISSIONS = ACCESS_RESOURCES.flatMap((resource) =>
+  ACTIONS.map((action) => buildPermission(resource.id, action))
+);
+
+const resourcePermissions = Object.fromEntries(
+  ACCESS_RESOURCES.flatMap((resource) =>
+    ACTIONS.map((action) => [
+      `${resource.id.toUpperCase().replace(/-/g, "_")}_${action.toUpperCase()}`,
+      buildPermission(resource.id, action),
+    ])
+  )
+) as Record<string, Permission>;
+
+export const PERMISSIONS: Record<string, Permission> = {
+  ...resourcePermissions,
+
+  ORGANISATION_MANAGE: buildPermission("settings", "update"),
+  TEAM_VIEW: buildPermission("team", "view"),
+  TEAM_MANAGE: buildPermission("users", "update"),
+  SALARY_VIEW: buildPermission("compensation-profiles", "view"),
+  SALARY_MANAGE: buildPermission("compensation-profiles", "update"),
+
+  LEAD_CREATE: buildPermission("leads", "post"),
+  LEAD_VIEW: buildPermission("leads", "view"),
+  LEAD_UPDATE: buildPermission("leads", "update"),
+  LEAD_ASSIGN: buildPermission("leads", "update"),
+  LEAD_CONVERT: buildPermission("leads", "update"),
+
+  PROPOSAL_CREATE: buildPermission("proposals", "post"),
+  PROPOSAL_SEND: buildPermission("proposals", "update"),
+  PROPOSAL_APPROVE: buildPermission("proposals", "update"),
+
+  PROJECT_CREATE: buildPermission("projects", "post"),
+  PROJECT_VIEW: buildPermission("projects", "view"),
+  PROJECT_UPDATE: buildPermission("projects", "update"),
+  PROJECT_ARCHIVE: buildPermission("projects", "delete"),
+  PROJECT_VIEW_FINANCE: buildPermission("project-expenses", "view"),
+
+  TASK_CREATE: buildPermission("tasks", "post"),
+  TASK_VIEW: buildPermission("tasks", "view"),
+  TASK_UPDATE: buildPermission("tasks", "update"),
+  TASK_ASSIGN: buildPermission("tasks", "update"),
+  TASK_REVIEW: buildPermission("tasks", "update"),
+  TASK_DELETE: buildPermission("tasks", "delete"),
+
+  TIME_CREATE: buildPermission("tasks", "update"),
+  TIME_APPROVE: buildPermission("tasks", "update"),
+
+  FINANCE_VIEW: buildPermission("finance", "view"),
+  FINANCE_MANAGE: buildPermission("finance", "update"),
+  INVOICE_CREATE: buildPermission("invoices", "post"),
+  INVOICE_APPROVE: buildPermission("invoices", "update"),
+  PAYMENT_RECORD: buildPermission("payments", "post"),
+
+  CAMPAIGN_CREATE: buildPermission("boards", "post"),
+  CAMPAIGN_APPROVE: buildPermission("approvals", "update"),
+  CAMPAIGN_PUBLISH: buildPermission("boards", "update"),
+
+  REPORT_VIEW: buildPermission("reports", "view"),
+  AUDIT_VIEW: buildPermission("reports", "view"),
+} as const;
+
 const P = PERMISSIONS;
 
-export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
-  [ROLES.OWNER]: Object.values(PERMISSIONS),
-  [ROLES.ADMIN]: [
-    P.ORGANISATION_MANAGE, P.TEAM_VIEW, P.TEAM_MANAGE, P.SALARY_VIEW,
-    P.LEAD_CREATE, P.LEAD_VIEW, P.LEAD_UPDATE, P.LEAD_ASSIGN, P.LEAD_CONVERT,
-    P.PROPOSAL_CREATE, P.PROPOSAL_SEND, P.PROPOSAL_APPROVE,
-    P.PROJECT_CREATE, P.PROJECT_VIEW, P.PROJECT_UPDATE, P.PROJECT_ARCHIVE, P.PROJECT_VIEW_FINANCE,
-    P.TASK_CREATE, P.TASK_ASSIGN, P.TASK_UPDATE, P.TASK_REVIEW, P.TASK_DELETE,
-    P.TIME_CREATE, P.TIME_APPROVE,
-    P.FINANCE_VIEW, P.FINANCE_MANAGE, P.INVOICE_CREATE, P.INVOICE_APPROVE, P.PAYMENT_RECORD,
-    P.CAMPAIGN_CREATE, P.CAMPAIGN_APPROVE, P.CAMPAIGN_PUBLISH,
-    P.REPORT_VIEW, P.AUDIT_VIEW,
-  ],
+export const DEFAULT_ROLE_PERMISSIONS: Record<Role, Permission[]> = {
+  [ROLES.OWNER]: ALL_PERMISSIONS,
+  [ROLES.ADMIN]: ALL_PERMISSIONS.filter((permission) => !permission.startsWith("access.")),
   [ROLES.PROJECT_MANAGER]: [
-    P.TEAM_VIEW,
-    P.LEAD_VIEW,
-    P.PROPOSAL_CREATE,
-    P.PROJECT_CREATE, P.PROJECT_VIEW, P.PROJECT_UPDATE, P.PROJECT_VIEW_FINANCE,
-    P.TASK_CREATE, P.TASK_ASSIGN, P.TASK_UPDATE, P.TASK_REVIEW, P.TASK_DELETE,
-    P.TIME_CREATE, P.TIME_APPROVE,
-    P.REPORT_VIEW,
+    P.DASHBOARD_VIEW, P.PROJECTS_VIEW, P.PROJECTS_POST, P.PROJECTS_UPDATE,
+    P.TASKS_VIEW, P.TASKS_POST, P.TASKS_UPDATE, P.TASKS_DELETE,
+    P.PROJECT_MILESTONES_VIEW, P.PROJECT_MILESTONES_POST, P.PROJECT_MILESTONES_UPDATE,
+    P.PROJECT_MEMBERS_VIEW, P.PROJECT_MEMBERS_POST, P.PROJECT_MEMBERS_UPDATE,
+    P.TEAM_VIEW, P.USERS_VIEW, P.REPORTS_VIEW,
   ],
   [ROLES.DEVELOPER]: [
-    P.PROJECT_VIEW,
-    P.TASK_CREATE, P.TASK_UPDATE,
-    P.TIME_CREATE,
+    P.DASHBOARD_VIEW, P.PROJECTS_VIEW, P.TASKS_VIEW, P.TASKS_POST, P.TASKS_UPDATE,
+    P.TASK_COMMENTS_VIEW, P.TASK_COMMENTS_POST, P.TASK_CHECKLISTS_VIEW, P.TASK_CHECKLISTS_UPDATE,
   ],
   [ROLES.DESIGNER]: [
-    P.PROJECT_VIEW,
-    P.TASK_CREATE, P.TASK_UPDATE,
-    P.TIME_CREATE,
+    P.DASHBOARD_VIEW, P.PROJECTS_VIEW, P.TASKS_VIEW, P.TASKS_POST, P.TASKS_UPDATE,
+    P.TASK_COMMENTS_VIEW, P.TASK_COMMENTS_POST,
   ],
   [ROLES.SALES]: [
-    P.LEAD_CREATE, P.LEAD_VIEW, P.LEAD_UPDATE, P.LEAD_ASSIGN, P.LEAD_CONVERT,
-    P.PROPOSAL_CREATE, P.PROPOSAL_SEND,
-    P.TIME_CREATE,
+    P.DASHBOARD_VIEW, P.LEADS_VIEW, P.LEADS_POST, P.LEADS_UPDATE,
+    P.CLIENTS_VIEW, P.CLIENTS_POST, P.CLIENTS_UPDATE,
+    P.PROPOSALS_VIEW, P.PROPOSALS_POST, P.PROPOSALS_UPDATE,
   ],
   [ROLES.MARKETING]: [
-    P.CAMPAIGN_CREATE, P.CAMPAIGN_PUBLISH,
-    P.TIME_CREATE,
+    P.DASHBOARD_VIEW, P.BOARDS_VIEW, P.BOARDS_POST, P.BOARDS_UPDATE,
   ],
   [ROLES.FINANCE]: [
-    P.SALARY_VIEW,
-    P.PROJECT_VIEW_FINANCE,
-    P.FINANCE_VIEW, P.FINANCE_MANAGE,
-    P.INVOICE_CREATE, P.PAYMENT_RECORD,
-    P.REPORT_VIEW,
+    P.DASHBOARD_VIEW, P.FINANCE_VIEW, P.INVOICES_VIEW, P.INVOICES_POST, P.INVOICES_UPDATE,
+    P.PAYMENTS_VIEW, P.PAYMENTS_POST, P.OPERATIONAL_EXPENSES_VIEW, P.OPERATIONAL_EXPENSES_POST,
+    P.PROJECT_EXPENSES_VIEW, P.REPORTS_VIEW,
   ],
   [ROLES.CLIENT]: [
-    P.PROJECT_VIEW,
+    P.DASHBOARD_VIEW, P.PROJECTS_VIEW, P.TASKS_VIEW,
   ],
 };
 
-export function hasPermission(role: Role, permission: Permission): boolean {
-  return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
+export function isRole(value: string): value is Role {
+  return ROLE_OPTIONS.some((role) => role.value === value);
 }
 
-export function requirePermission(params: {
-  role: Role;
-  permission: Permission;
-}): void {
-  if (!hasPermission(params.role, params.permission)) {
-    throw new AuthorizationError(
-      `Role "${params.role}" lacks permission "${params.permission}"`
-    );
-  }
+export function isPermission(value: string): value is Permission {
+  return ALL_PERMISSIONS.includes(value as Permission);
 }
 
-export function getPermissionsForRole(role: Role): Permission[] {
-  return ROLE_PERMISSIONS[role] ?? [];
+export function hasPermission(
+  role: Role,
+  permission: Permission,
+  permissions?: readonly Permission[]
+): boolean {
+  if (role === ROLES.OWNER) return true;
+  return (permissions ?? DEFAULT_ROLE_PERMISSIONS[role] ?? []).includes(permission);
 }

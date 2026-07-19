@@ -5,6 +5,9 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 import { generateRequestId } from "@/lib/correlation";
 import { AuthenticationError, NotFoundError } from "@/lib/errors";
 import { decrypt } from "@/lib/auth";
+import { PERMISSIONS } from "@/lib/permissions";
+import { requirePermission } from "@/lib/permission-store";
+import { createDataScopeResolver, mergeDataScope } from "@/lib/data-scope";
 import Project from "@/models/Project";
 import Task from "@/models/Task";
 
@@ -15,22 +18,30 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!token) throw new AuthenticationError();
     const session = await decrypt(token);
     if (!session) throw new AuthenticationError();
+    await requirePermission({ role: session.role, organisationId: session.organisationId, permission: PERMISSIONS.PROJECTS_VIEW });
 
     await connectDB();
     const { id } = await params;
     const orgId = new mongoose.Types.ObjectId(session.organisationId);
     const projectId = new mongoose.Types.ObjectId(id);
+    const getDataScope = createDataScopeResolver(session);
+    const [projectScope, taskScope] = await Promise.all([
+      getDataScope("Project"),
+      getDataScope("Task"),
+    ]);
 
-    const project = await Project.findOne({ _id: projectId, organisationId: orgId }).lean();
+    const project = await Project.findOne(
+      mergeDataScope({ _id: projectId, organisationId: orgId }, projectScope)
+    ).lean();
     if (!project) throw new NotFoundError("Project", id);
 
     const [taskStats, taskCostStats] = await Promise.all([
       Task.aggregate([
-        { $match: { organisationId: orgId, projectId } },
+        { $match: mergeDataScope({ organisationId: orgId, projectId }, taskScope) },
         { $group: { _id: "$status", count: { $sum: 1 } } },
       ]),
       Task.aggregate([
-        { $match: { organisationId: orgId, projectId } },
+        { $match: mergeDataScope({ organisationId: orgId, projectId }, taskScope) },
         { $group: { _id: null, totalMinutes: { $sum: "$actualMinutes" }, totalCost: { $sum: "$actualCost" } } },
       ]),
     ]);

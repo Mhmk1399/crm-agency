@@ -37,7 +37,7 @@ const activeBg: Record<string, string> = {
 export default function StatusPicker({ open, onClose, title, currentStatus, options, onSelect, isLoading }: StatusPickerProps) {
   return (
     <Modal open={open} onClose={onClose} title={title} size="sm">
-      <div className="flex flex-col gap-2 mt-2">
+      <div className="mt-1 flex min-w-0 flex-col gap-2">
         {options.map((opt) => {
           const isCurrent = opt.value === currentStatus;
           return (
@@ -45,14 +45,14 @@ export default function StatusPicker({ open, onClose, title, currentStatus, opti
               key={opt.value}
               disabled={isCurrent || isLoading}
               onClick={() => onSelect(opt.value)}
-              className={`flex items-center justify-between px-4 py-3 rounded-[var(--radius-sm)] border text-[14px] font-medium transition-all duration-200 disabled:cursor-not-allowed ${variantBg[opt.variant]} ${isCurrent ? activeBg[opt.variant] : ""}`}
+              className={`flex min-w-0 items-center justify-between gap-3 px-4 py-3 rounded-[var(--radius-sm)] border text-[14px] font-medium transition-all duration-200 disabled:cursor-not-allowed ${variantBg[opt.variant]} ${isCurrent ? activeBg[opt.variant] : ""}`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <div className={`w-2.5 h-2.5 rounded-full ${isCurrent ? "bg-current" : "bg-current opacity-40"}`} />
-                <span>{opt.label}</span>
+                <span className="min-w-0 truncate">{opt.label}</span>
               </div>
               {isCurrent && (
-                <span className="text-[11px] font-semibold uppercase tracking-wider opacity-60">Current</span>
+                <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider opacity-60">Current</span>
               )}
             </button>
           );

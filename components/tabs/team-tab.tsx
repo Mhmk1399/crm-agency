@@ -10,13 +10,15 @@ import StatusPicker, { type StatusOption } from "@/components/ui/status-picker";
 import type { ReportBadge } from "@/components/dashboard/report-badges";
 import type { FieldConfig } from "@/types/dynamic-form";
 import type { ColumnConfig } from "@/types/dynamic-table";
+import toast from "@/components/ui/toast";
+import { useSession } from "@/lib/use-session";
+import { buildPermission } from "@/lib/permissions";
 
 // ── Types ──
 interface User { _id: string; name: string; email: string; role: string; isActive: boolean; lastLoginAt?: string; createdAt: string; [key: string]: unknown }
 interface Profile { _id: string; userId: string; title: string; department: string; skills: string[]; startDate: string; endDate?: string; employmentType: string; weeklyCapacityHours: number; isActive: boolean; [key: string]: unknown }
 interface Compensation { _id: string; userId: string; salary: number; employerCosts: number; fullyLoadedMonthlyCost: number; realisticBillableHours: number; internalHourlyCost: number; effectiveFrom: string; isActive: boolean; [key: string]: unknown }
 interface Task { _id: string; title: string; status: string; assigneeIds: string[]; estimatedMinutes: number; actualMinutes: number; projectId?: string; [key: string]: unknown }
-interface Project { _id: string; name: string; projectCode: string; [key: string]: unknown }
 
 type SubTab = "users" | "profiles" | "workload";
 
@@ -69,7 +71,7 @@ const fmtH = (mins: number) => { const h = Math.floor(mins / 60); const m = mins
 // ── Sub-tab button ──
 function TabBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={`px-4 py-2 text-[13px] font-medium rounded-lg transition-all ${active ? "bg-primary text-white shadow-sm" : "text-muted hover:text-foreground hover:bg-muted-bg"}`}>
+    <button onClick={onClick} className={`shrink-0 whitespace-nowrap px-4 py-2 text-[13px] font-medium rounded-lg transition-all ${active ? "bg-primary text-white shadow-sm" : "text-muted hover:text-foreground hover:bg-muted-bg"}`}>
       {label}
     </button>
   );
@@ -91,6 +93,8 @@ function MiniDonut({ used, total, color }: { used: number; total: number; color:
 
 // ── Main ──
 export default function TeamTab() {
+  const { can } = useSession();
+  const canUpdateUsers = can(buildPermission("users", "update"));
   const [subTab, setSubTab] = useState<SubTab>("users");
   const [statusUser, setStatusUser] = useState<User | null>(null);
 
@@ -102,15 +106,9 @@ export default function TeamTab() {
     queryKey: ["tasks"],
     queryFn: async () => { const r = await fetch("/api/tasks?limit=1000"); const j = await r.json(); return j.success ? (j.data.data ?? []) : []; },
   });
-  const { data: projects = [] } = useQuery<Project[]>({
-    queryKey: ["projects"],
-    queryFn: async () => { const r = await fetch("/api/projects?limit=200"); const j = await r.json(); return j.success ? (j.data.data ?? []) : []; },
-  });
-
   const userMap = useMemo(() => new Map(userCrud.data.map(u => [u._id, u.name])), [userCrud.data]);
   const userOptions = useMemo(() => userCrud.data.map(u => ({ label: `${u.name} (${u.email})`, value: u._id })), [userCrud.data]);
   const profileMap = useMemo(() => new Map(profileCrud.data.map(p => [p.userId, p])), [profileCrud.data]);
-  const projectMap = useMemo(() => new Map(projects.map(p => [p._id, p.name])), [projects]);
 
   // ── Workload from tasks ──
   const workload = useMemo(() => {
@@ -150,13 +148,13 @@ export default function TeamTab() {
     { key: "role", label: "Role", sortable: true, render: (v) => <Badge variant={roleVariant[String(v)] ?? "default"}>{String(v).replace(/_/g, " ")}</Badge> },
     { key: "isActive", label: "Status",
       render: (_v, row) => (
-        <button type="button" onClick={(e) => { e.stopPropagation(); setStatusUser(row); }} className="cursor-pointer">
+        <button type="button" onClick={(e) => { e.stopPropagation(); setStatusUser(row); }} className="cursor-pointer" disabled={!canUpdateUsers}>
           <Badge variant={row.isActive ? "success" : "default"}>{row.isActive ? "Active" : "Inactive"}</Badge>
         </button>
       ),
     },
     { key: "lastLoginAt", label: "Last Login", sortable: true, hideOnMobile: true, render: (v) => v ? new Date(String(v)).toLocaleDateString() : "Never" },
-  ], []);
+  ], [canUpdateUsers]);
 
   const userBadges: ReportBadge[] = useMemo(() => {
     const d = userCrud.data;
@@ -174,7 +172,7 @@ export default function TeamTab() {
 
   // ── Profile fields ──
   const profileFields: FieldConfig[] = useMemo(() => [
-    { name: "userId", label: "User", type: "searchselect" as const, required: true, options: userOptions, placeholder: "Select user..." },
+    { name: "userId", label: "User", type: "searchselect" as const, required: true, options: userOptions, optionsLoading: userCrud.loading, placeholder: "Select user..." },
     { name: "title", label: "Job Title", type: "text" as const, required: true, placeholder: "Senior Developer" },
     { name: "department", label: "Department", type: "select" as const, required: true, options: [
       { label: "Engineering", value: "engineering" }, { label: "Design", value: "design" },
@@ -189,7 +187,7 @@ export default function TeamTab() {
     { name: "startDate", label: "Start Date", type: "date" as const, required: true },
     { name: "endDate", label: "End Date", type: "date" as const },
     { name: "skills", label: "Skills", type: "text" as const, placeholder: "React, Node.js, Figma", description: "Comma separated" },
-  ], [userOptions]);
+  ], [userOptions, userCrud.loading]);
 
   const profileColumns: ColumnConfig<Profile>[] = useMemo(() => [
     { key: "userId", label: "User", sortable: true, render: (v) => userMap.get(String(v)) ?? "—" },
@@ -202,7 +200,7 @@ export default function TeamTab() {
 
   // ── Compensation fields ──
   const compFields: FieldConfig[] = useMemo(() => [
-    { name: "userId", label: "User", type: "searchselect" as const, required: true, options: userOptions, placeholder: "Select user..." },
+    { name: "userId", label: "User", type: "searchselect" as const, required: true, options: userOptions, optionsLoading: userCrud.loading, placeholder: "Select user..." },
     { name: "salary", label: "Monthly Salary", type: "currency" as const, required: true, prefix: "T" },
     { name: "employerCosts", label: "Employer Costs", type: "currency" as const, prefix: "T", description: "Insurance, tax, etc." },
     { name: "softwareAllocation", label: "Software Cost", type: "currency" as const, prefix: "T" },
@@ -214,7 +212,7 @@ export default function TeamTab() {
     { name: "realisticBillableHours", label: "Billable Hours/Month", type: "number" as const, required: true },
     { name: "internalHourlyCost", label: "Internal Hourly Cost", type: "currency" as const, prefix: "T", required: true, description: "Total Cost ÷ Billable Hours" },
     { name: "effectiveFrom", label: "Effective From", type: "date" as const, required: true },
-  ], [userOptions]);
+  ], [userOptions, userCrud.loading]);
 
   const compColumns: ColumnConfig<Compensation>[] = useMemo(() => [
     { key: "userId", label: "User", sortable: true, render: (v) => userMap.get(String(v)) ?? "—" },
@@ -226,13 +224,13 @@ export default function TeamTab() {
   ], [userMap]);
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 max-w-full space-y-6 overflow-x-hidden">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Team</h1>
         <p className="text-[14px] text-muted mt-1">Manage members, profiles, compensation, and workload</p>
       </div>
 
-      <div className="flex items-center gap-1 bg-muted-bg rounded-lg p-1 w-fit">
+      <div className="dynamic-table-scroll flex w-full max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted-bg p-1 sm:w-fit">
         <TabBtn label="Users" active={subTab === "users"} onClick={() => setSubTab("users")} />
         <TabBtn label="Profiles & Compensation" active={subTab === "profiles"} onClick={() => setSubTab("profiles")} />
         <TabBtn label="Workload" active={subTab === "workload"} onClick={() => setSubTab("workload")} />
@@ -266,6 +264,7 @@ export default function TeamTab() {
             }}
             onDelete={(id) => userCrud.remove(id)}
             addLabel="+ Add Member"
+            accessResource="users"
           />
           <StatusPicker
             open={statusUser !== null}
@@ -275,6 +274,11 @@ export default function TeamTab() {
             options={activeOptions}
             onSelect={async (v) => {
               if (!statusUser) return;
+              if (!canUpdateUsers) {
+                toast.error("You do not have permission to update users.");
+                setStatusUser(null);
+                return;
+              }
               await userCrud.update(statusUser._id, { isActive: v === "true" });
               setStatusUser(null);
             }}
@@ -304,6 +308,7 @@ export default function TeamTab() {
             }}
             onDelete={(id) => profileCrud.remove(id)}
             addLabel="+ Add Profile"
+            accessResource="team-member-profiles"
           />
 
           <CrudTab
@@ -318,6 +323,7 @@ export default function TeamTab() {
             onUpdate={(id, d) => compCrud.update(id, d)}
             onDelete={(id) => compCrud.remove(id)}
             addLabel="+ Add Compensation"
+            accessResource="compensation-profiles"
           />
         </div>
       )}

@@ -2,10 +2,10 @@ import { createDetailHandlers } from "@/lib/route-handler";
 import { PERMISSIONS } from "@/lib/permissions";
 
 const handlers = createDetailHandlers({
-  model: async () => (await import("@/models/FinancialSnapshot")).default as any,
+  model: async () => (await import("@/models/FinancialSnapshot")).default,
   modelName: "FinancialSnapshot",
   permissions: {
-    get: PERMISSIONS.FINANCE_VIEW,
+    get: PERMISSIONS.FINANCIAL_SNAPSHOTS_VIEW,
   },
   populateFields: [],
 });

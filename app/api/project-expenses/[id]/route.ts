@@ -2,12 +2,12 @@ import { createDetailHandlers } from "@/lib/route-handler";
 import { PERMISSIONS } from "@/lib/permissions";
 
 const handlers = createDetailHandlers({
-  model: async () => (await import("@/models/ProjectExpense")).default as any,
+  model: async () => (await import("@/models/ProjectExpense")).default,
   modelName: "ProjectExpense",
   permissions: {
-    get: PERMISSIONS.FINANCE_VIEW,
-    update: PERMISSIONS.FINANCE_MANAGE,
-    delete: PERMISSIONS.FINANCE_MANAGE,
+    get: PERMISSIONS.PROJECT_EXPENSES_VIEW,
+    update: PERMISSIONS.PROJECT_EXPENSES_UPDATE,
+    delete: PERMISSIONS.PROJECT_EXPENSES_DELETE,
   },
   populateFields: [],
 });

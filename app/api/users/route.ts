@@ -2,11 +2,11 @@ import { createCrudHandlers } from "@/lib/route-handler";
 import { PERMISSIONS } from "@/lib/permissions";
 
 const handlers = createCrudHandlers({
-  model: async () => (await import("@/models/User")).default as any,
+  model: async () => (await import("@/models/User")).default,
   modelName: "User",
   permissions: {
-    list: PERMISSIONS.TEAM_VIEW,
-    create: PERMISSIONS.TEAM_MANAGE,
+    list: PERMISSIONS.USERS_VIEW,
+    create: PERMISSIONS.USERS_POST,
   },
   searchFields: ["name", "email"],
   sensitiveFields: ["passwordHash"],

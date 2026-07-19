@@ -6,7 +6,8 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 import { generateRequestId } from "@/lib/correlation";
 import { AuthenticationError, ConflictError, ValidationError } from "@/lib/errors";
 import { decrypt } from "@/lib/auth";
-import { requirePermission, PERMISSIONS } from "@/lib/permissions";
+import { PERMISSIONS } from "@/lib/permissions";
+import { requirePermission } from "@/lib/permission-store";
 import User from "@/models/User";
 
 const VALID_ROLES = ["owner", "admin", "project_manager", "developer", "designer", "sales", "marketing", "finance", "client"] as const;
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (!token) throw new AuthenticationError();
     const session = await decrypt(token);
     if (!session) throw new AuthenticationError();
-    requirePermission({ role: session.role, permission: PERMISSIONS.TEAM_MANAGE });
+    await requirePermission({ role: session.role, organisationId: session.organisationId, permission: PERMISSIONS.USERS_POST });
 
     const body = await request.json();
     const parsed = schema.safeParse(body);

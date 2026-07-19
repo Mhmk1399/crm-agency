@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { hasPermission, type Permission, type Role } from "@/lib/permissions";
 
 export interface Session {
   userId: string;
@@ -8,9 +9,10 @@ export interface Session {
   role: string;
   email: string;
   name: string;
+  permissions: Permission[];
 }
 
-const ADMIN_ROLES = ["owner", "admin", "project_manager"];
+const ADMIN_ROLES = ["owner", "admin"];
 const SALES_ROLES = ["owner", "admin", "sales"];
 const FINANCE_ROLES = ["owner", "admin", "finance"];
 
@@ -26,10 +28,12 @@ export function useSession() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const role = session?.role ?? "developer";
+  const role = (session?.role ?? "developer") as Role;
+  const permissions = session?.permissions ?? [];
   const isAdmin = ADMIN_ROLES.includes(role);
   const isSales = SALES_ROLES.includes(role);
   const isFinance = FINANCE_ROLES.includes(role);
+  const can = (permission: Permission) => hasPermission(role, permission, permissions);
 
-  return { session, isLoading, role, isAdmin, isSales, isFinance };
+  return { session, isLoading, role, permissions, can, isAdmin, isSales, isFinance };
 }

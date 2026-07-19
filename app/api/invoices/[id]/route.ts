@@ -2,11 +2,11 @@ import { createDetailHandlers } from "@/lib/route-handler";
 import { PERMISSIONS } from "@/lib/permissions";
 
 const handlers = createDetailHandlers({
-  model: async () => (await import("@/models/Invoice")).default as any,
+  model: async () => (await import("@/models/Invoice")).default,
   modelName: "Invoice",
   permissions: {
-    get: PERMISSIONS.FINANCE_VIEW,
-    update: PERMISSIONS.FINANCE_MANAGE,
+    get: PERMISSIONS.INVOICES_VIEW,
+    update: PERMISSIONS.INVOICES_UPDATE,
   },
   populateFields: ["clientId", "projectId"],
 });

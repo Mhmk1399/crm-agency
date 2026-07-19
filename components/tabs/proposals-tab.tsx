@@ -7,6 +7,9 @@ import CrudTab from "@/components/dashboard/crud-tab";
 import DetailModal, { type DetailField } from "@/components/ui/detail-modal";
 import StatusPicker, { type StatusOption } from "@/components/ui/status-picker";
 import Badge from "@/components/ui/badge";
+import toast from "@/components/ui/toast";
+import { useSession } from "@/lib/use-session";
+import { buildPermission } from "@/lib/permissions";
 import type { ReportBadge } from "@/components/dashboard/report-badges";
 import type { FieldConfig } from "@/types/dynamic-form";
 import type { ColumnConfig, TableAction } from "@/types/dynamic-table";
@@ -32,9 +35,17 @@ const schema = z.object({
 });
 
 // --- Status config ---
-const statusVariant: Record<string, "primary" | "success" | "warning" | "destructive" | "default"> = {
-  draft: "default", sent: "primary", viewed: "warning",
-  accepted: "success", rejected: "destructive", expired: "default", cancelled: "default",
+const statusVariant: Record<
+  string,
+  "primary" | "success" | "warning" | "destructive" | "default"
+> = {
+  draft: "default",
+  sent: "primary",
+  viewed: "warning",
+  accepted: "success",
+  rejected: "destructive",
+  expired: "default",
+  cancelled: "default",
 };
 
 const statusOptions: StatusOption[] = [
@@ -56,16 +67,42 @@ const fmt = (v: number) => {
 };
 
 // --- Types ---
-interface Lead { _id: string; name: string; companyName: string; [key: string]: unknown }
-interface Client { _id: string; name: string; companyName: string; [key: string]: unknown }
+interface Lead {
+  _id: string;
+  name: string;
+  companyName: string;
+  [key: string]: unknown;
+}
+interface Client {
+  _id: string;
+  name: string;
+  companyName: string;
+  [key: string]: unknown;
+}
 interface Proposal {
-  _id: string; title: string; proposalNumber: string; description?: string;
-  leadId?: string; clientId?: string; status: string;
-  subtotal: number; discount: number; tax: number; total: number;
-  expectedCost: number; expectedProfit: number; expectedMarginPercentage: number;
-  validUntil?: string; rejectionReason?: string; notes?: string;
-  sentAt?: string; viewedAt?: string; acceptedAt?: string; rejectedAt?: string;
-  createdAt: string; updatedAt?: string;
+  _id: string;
+  title: string;
+  proposalNumber: string;
+  description?: string;
+  leadId?: string;
+  clientId?: string;
+  status: string;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  expectedCost: number;
+  expectedProfit: number;
+  expectedMarginPercentage: number;
+  validUntil?: string;
+  rejectionReason?: string;
+  notes?: string;
+  sentAt?: string;
+  viewedAt?: string;
+  acceptedAt?: string;
+  rejectedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
   [key: string]: unknown;
 }
 
@@ -73,39 +110,116 @@ interface Proposal {
 const columns: ColumnConfig<Proposal>[] = [
   { key: "proposalNumber", label: "#", sortable: true },
   { key: "title", label: "Title", sortable: true },
-  { key: "status", label: "Status", sortable: true,
-    render: (v) => <Badge variant={statusVariant[String(v)] ?? "default"}>{String(v).replace(/_/g, " ")}</Badge> },
-  { key: "total", label: "Total", sortable: true, align: "right", render: (v) => fmt(Number(v)) },
-  { key: "expectedCost", label: "Cost", sortable: true, align: "right", hideOnMobile: true, render: (v) => fmt(Number(v)) },
-  { key: "expectedProfit", label: "Profit", sortable: true, align: "right", hideOnMobile: true,
+  {
+    key: "status",
+    label: "Status",
+    sortable: true,
+    render: (v) => (
+      <Badge variant={statusVariant[String(v)] ?? "default"}>
+        {String(v).replace(/_/g, " ")}
+      </Badge>
+    ),
+  },
+  {
+    key: "total",
+    label: "Total",
+    sortable: true,
+    align: "right",
+    render: (v) => fmt(Number(v)),
+  },
+  {
+    key: "expectedCost",
+    label: "Cost",
+    sortable: true,
+    align: "right",
+    hideOnMobile: true,
+    render: (v) => fmt(Number(v)),
+  },
+  {
+    key: "expectedProfit",
+    label: "Profit",
+    sortable: true,
+    align: "right",
+    hideOnMobile: true,
     render: (v) => {
       const n = Number(v);
-      return <span className={n > 0 ? "text-success font-medium" : n < 0 ? "text-destructive font-medium" : ""}>{fmt(n)}</span>;
-    }},
-  { key: "expectedMarginPercentage", label: "Margin", sortable: true, align: "right",
+      return (
+        <span
+          className={
+            n > 0
+              ? "text-success font-medium"
+              : n < 0
+                ? "text-destructive font-medium"
+                : ""
+          }
+        >
+          {fmt(n)}
+        </span>
+      );
+    },
+  },
+  {
+    key: "expectedMarginPercentage",
+    label: "Margin",
+    sortable: true,
+    align: "right",
     render: (v) => {
       const n = Number(v);
-      const color = n >= 40 ? "text-success" : n >= 20 ? "text-warning" : "text-destructive";
+      const color =
+        n >= 40
+          ? "text-success"
+          : n >= 20
+            ? "text-warning"
+            : "text-destructive";
       return <span className={`font-semibold ${color}`}>{n.toFixed(1)}%</span>;
-    }},
-  { key: "validUntil", label: "Valid Until", sortable: true, hideOnMobile: true,
+    },
+  },
+  {
+    key: "validUntil",
+    label: "Valid Until",
+    sortable: true,
+    hideOnMobile: true,
     render: (v) => {
       if (!v) return <span className="text-muted">—</span>;
       const d = new Date(String(v));
       const expired = d < new Date();
-      return <span className={expired ? "text-destructive font-medium" : ""}>{d.toLocaleDateString()}</span>;
-    }},
+      return (
+        <span className={expired ? "text-destructive font-medium" : ""}>
+          {d.toLocaleDateString()}
+        </span>
+      );
+    },
+  },
 ];
 
 // --- Detail view ---
-function buildDetailFields(p: Proposal, leadName?: string, clientName?: string): DetailField[] {
+function buildDetailFields(
+  p: Proposal,
+  leadName?: string,
+  clientName?: string,
+): DetailField[] {
   return [
     { label: "Title", value: p.title },
     { label: "Proposal #", value: p.proposalNumber },
-    { label: "Status", value: p.status, type: "badge", badgeVariant: statusVariant[p.status] ?? "default" },
+    {
+      label: "Status",
+      value: p.status,
+      type: "badge",
+      badgeVariant: statusVariant[p.status] ?? "default",
+    },
     { label: "Valid Until", value: p.validUntil, type: "date" },
-    { label: "Linked Lead", value: leadName, type: leadName ? "badge" : "text", badgeVariant: "primary" },
-    { label: "Linked Client", value: clientName, type: clientName ? "badge" : "text", badgeVariant: "success" },
+    {
+      label: "Linked Lead",
+      value: leadName,
+      type: leadName ? "badge" : "text",
+      badgeVariant: "primary",
+    },
+    {
+      label: "Linked Client",
+      value: clientName,
+      type: clientName ? "badge" : "text",
+      badgeVariant: "success",
+    },
     { label: "Description", value: p.description, colSpan: 2 },
     { label: "Subtotal", value: p.subtotal, type: "currency" },
     { label: "Discount", value: p.discount, type: "currency" },
@@ -113,7 +227,11 @@ function buildDetailFields(p: Proposal, leadName?: string, clientName?: string):
     { label: "Total", value: p.total, type: "currency" },
     { label: "Expected Cost", value: p.expectedCost, type: "currency" },
     { label: "Expected Profit", value: p.expectedProfit, type: "currency" },
-    { label: "Expected Margin", value: p.expectedMarginPercentage, type: "percentage" },
+    {
+      label: "Expected Margin",
+      value: p.expectedMarginPercentage,
+      type: "percentage",
+    },
     { label: "Sent At", value: p.sentAt, type: "date" },
     { label: "Viewed At", value: p.viewedAt, type: "date" },
     { label: "Accepted At", value: p.acceptedAt, type: "date" },
@@ -130,43 +248,152 @@ export default function ProposalsTab() {
   const crud = useCrud<Proposal>({ endpoint: "proposals", label: "Proposal" });
   const leads = useCrud<Lead>({ endpoint: "leads", label: "Lead" });
   const clients = useCrud<Client>({ endpoint: "clients", label: "Client" });
+  const { can } = useSession();
+  const canUpdateProposal = can(buildPermission("proposals", "update"));
 
   const [viewProposal, setViewProposal] = useState<Proposal | null>(null);
   const [statusProposal, setStatusProposal] = useState<Proposal | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
 
   const leadOptions = useMemo(
-    () => leads.data.map((l) => ({ label: `${l.name} — ${l.companyName}`, value: l._id })),
-    [leads.data]
+    () =>
+      leads.data.map((l) => ({
+        label: `${l.name} — ${l.companyName}`,
+        value: l._id,
+      })),
+    [leads.data],
   );
   const clientOptions = useMemo(
-    () => clients.data.map((c) => ({ label: `${c.name} — ${c.companyName}`, value: c._id })),
-    [clients.data]
+    () =>
+      clients.data.map((c) => ({
+        label: `${c.name} — ${c.companyName}`,
+        value: c._id,
+      })),
+    [clients.data],
   );
-  const leadMap = useMemo(() => new Map(leads.data.map((l) => [l._id, `${l.name} (${l.companyName})`])), [leads.data]);
-  const clientMap = useMemo(() => new Map(clients.data.map((c) => [c._id, `${c.name} (${c.companyName})`])), [clients.data]);
+  const leadMap = useMemo(
+    () =>
+      new Map(leads.data.map((l) => [l._id, `${l.name} (${l.companyName})`])),
+    [leads.data],
+  );
+  const clientMap = useMemo(
+    () =>
+      new Map(clients.data.map((c) => [c._id, `${c.name} (${c.companyName})`])),
+    [clients.data],
+  );
 
-  const fields: FieldConfig[] = useMemo(() => [
-    { name: "title", label: "Title", type: "text" as const, required: true, placeholder: "Proposal title" },
-    { name: "proposalNumber", label: "Proposal #", type: "text" as const, required: true, placeholder: "PROP-001" },
-    { name: "leadId", label: "Lead", type: "searchselect" as const, placeholder: "Search leads...", options: leadOptions, description: "Link to an existing lead" },
-    { name: "clientId", label: "Client", type: "searchselect" as const, placeholder: "Search clients...", options: clientOptions, description: "Link to an existing client" },
-    { name: "status", label: "Status", type: "select" as const, required: true, options: statusOptions.map((s) => ({ label: s.label, value: s.value })) },
-    { name: "validUntil", label: "Valid Until", type: "date" as const },
-    { name: "subtotal", label: "Subtotal", type: "currency" as const, prefix: "T", required: true },
-    { name: "discount", label: "Discount", type: "currency" as const, prefix: "T" },
-    { name: "tax", label: "Tax", type: "currency" as const, prefix: "T" },
-    { name: "total", label: "Total", type: "currency" as const, prefix: "T", required: true },
-    { name: "expectedCost", label: "Expected Cost", type: "currency" as const, prefix: "T", description: "Estimated delivery cost" },
-    { name: "expectedProfit", label: "Expected Profit", type: "currency" as const, prefix: "T" },
-    { name: "expectedMarginPercentage", label: "Expected Margin", type: "percentage" as const },
-    { name: "rejectionReason", label: "Rejection Reason", type: "text" as const, placeholder: "If rejected" },
-    { name: "description", label: "Description", type: "textarea" as const, colSpan: 2 as const, placeholder: "Scope and deliverables..." },
-    { name: "notes", label: "Notes", type: "textarea" as const, colSpan: 2 as const, placeholder: "Internal notes..." },
-  ], [leadOptions, clientOptions]);
+  const fields: FieldConfig[] = useMemo(
+    () => [
+      {
+        name: "title",
+        label: "Title",
+        type: "text" as const,
+        required: true,
+        placeholder: "Proposal title",
+      },
+      {
+        name: "proposalNumber",
+        label: "Proposal #",
+        type: "text" as const,
+        required: true,
+        placeholder: "PROP-001",
+      },
+      {
+        name: "leadId",
+        label: "Lead",
+        type: "searchselect" as const,
+        placeholder: "Search leads...",
+        options: leadOptions,
+        optionsLoading: leads.loading,
+        description: "Link to an existing lead",
+      },
+      {
+        name: "clientId",
+        label: "Client",
+        type: "searchselect" as const,
+        placeholder: "Search clients...",
+        options: clientOptions,
+        optionsLoading: clients.loading,
+        description: "Link to an existing client",
+      },
+      {
+        name: "status",
+        label: "Status",
+        type: "select" as const,
+        required: true,
+        options: statusOptions.map((s) => ({ label: s.label, value: s.value })),
+      },
+      { name: "validUntil", label: "Valid Until", type: "date" as const },
+      {
+        name: "subtotal",
+        label: "Subtotal",
+        type: "currency" as const,
+        prefix: "T",
+        required: true,
+      },
+      {
+        name: "discount",
+        label: "Discount",
+        type: "currency" as const,
+        prefix: "T",
+      },
+      { name: "tax", label: "Tax", type: "currency" as const, prefix: "T" },
+      {
+        name: "total",
+        label: "Total",
+        type: "currency" as const,
+        prefix: "T",
+        required: true,
+      },
+      {
+        name: "expectedCost",
+        label: "Expected Cost",
+        type: "currency" as const,
+        prefix: "T",
+        description: "Estimated delivery cost",
+      },
+      {
+        name: "expectedProfit",
+        label: "Expected Profit",
+        type: "currency" as const,
+        prefix: "T",
+      },
+      {
+        name: "expectedMarginPercentage",
+        label: "Expected Margin",
+        type: "percentage" as const,
+      },
+      {
+        name: "rejectionReason",
+        label: "Rejection Reason",
+        type: "text" as const,
+        placeholder: "If rejected",
+      },
+      {
+        name: "description",
+        label: "Description",
+        type: "textarea" as const,
+        colSpan: 2 as const,
+        placeholder: "Scope and deliverables...",
+      },
+      {
+        name: "notes",
+        label: "Notes",
+        type: "textarea" as const,
+        colSpan: 2 as const,
+        placeholder: "Internal notes...",
+      },
+    ],
+    [leadOptions, leads.loading, clientOptions, clients.loading],
+  );
 
   async function handleStatusChange(newStatus: string) {
     if (!statusProposal) return;
+    if (!canUpdateProposal) {
+      toast.error("You do not have permission to update proposals.");
+      setStatusProposal(null);
+      return;
+    }
     setStatusLoading(true);
     const extra: Record<string, unknown> = { status: newStatus };
     if (newStatus === "sent") extra.sentAt = new Date().toISOString();
@@ -180,13 +407,44 @@ export default function ProposalsTab() {
   const extraActions: TableAction<Proposal>[] = [
     {
       label: "View",
-      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>,
+      icon: (
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      ),
       onClick: (row) => setViewProposal(row),
     },
     {
       label: "Status",
-      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>,
+      icon: (
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="17 1 21 5 17 9" />
+          <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+          <polyline points="7 23 3 19 7 15" />
+          <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+        </svg>
+      ),
       onClick: (row) => setStatusProposal(row),
+      show: () => canUpdateProposal,
     },
   ];
 
@@ -204,8 +462,16 @@ export default function ProposalsTab() {
       { label: "Total", value: d.length, variant: "default" },
       { label: "Draft", value: byStatus["draft"] ?? 0, variant: "default" },
       { label: "Sent", value: byStatus["sent"] ?? 0, variant: "primary" },
-      { label: "Accepted", value: byStatus["accepted"] ?? 0, variant: "success" },
-      { label: "Rejected", value: byStatus["rejected"] ?? 0, variant: "destructive" },
+      {
+        label: "Accepted",
+        value: byStatus["accepted"] ?? 0,
+        variant: "success",
+      },
+      {
+        label: "Rejected",
+        value: byStatus["rejected"] ?? 0,
+        variant: "destructive",
+      },
       { label: "Open Value", value: fmt(totalValue), variant: "warning" },
       { label: "Won Profit", value: fmt(totalProfit), variant: "success" },
     ] as ReportBadge[];
@@ -223,11 +489,14 @@ export default function ProposalsTab() {
         schema={schema}
         reportBadges={badges}
         extraActions={extraActions}
-        onCreate={(d) => crud.create({ ...d, status: d.status ?? "draft", items: [] })}
+        onCreate={(d) =>
+          crud.create({ ...d, status: d.status ?? "draft", items: [] })
+        }
         onUpdate={(id, d) => crud.update(id, d)}
         onDelete={(id) => crud.remove(id)}
         addLabel="+ New Proposal"
         nameKey="title"
+        accessResource="proposals"
       />
 
       <DetailModal
@@ -235,11 +504,15 @@ export default function ProposalsTab() {
         onClose={() => setViewProposal(null)}
         title={viewProposal?.title ?? ""}
         subtitle={`#${viewProposal?.proposalNumber ?? ""}`}
-        fields={viewProposal ? buildDetailFields(
-          viewProposal,
-          leadMap.get(viewProposal.leadId ?? ""),
-          clientMap.get(viewProposal.clientId ?? ""),
-        ) : []}
+        fields={
+          viewProposal
+            ? buildDetailFields(
+                viewProposal,
+                leadMap.get(viewProposal.leadId ?? ""),
+                clientMap.get(viewProposal.clientId ?? ""),
+              )
+            : []
+        }
       />
 
       <StatusPicker

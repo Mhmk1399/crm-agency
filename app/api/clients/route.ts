@@ -2,9 +2,12 @@ import { createCrudHandlers } from "@/lib/route-handler";
 import { PERMISSIONS } from "@/lib/permissions";
 
 const handlers = createCrudHandlers({
-  model: async () => (await import("@/models/Client")).default as any,
+  model: async () => (await import("@/models/Client")).default,
   modelName: "Client",
-
+  permissions: {
+    list: PERMISSIONS.CLIENTS_VIEW,
+    create: PERMISSIONS.CLIENTS_POST,
+  },
   searchFields: ["name", "companyName", "email"],
   populateFields: [],
 });

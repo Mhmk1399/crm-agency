@@ -2,11 +2,11 @@ import { createCrudHandlers } from "@/lib/route-handler";
 import { PERMISSIONS } from "@/lib/permissions";
 
 const handlers = createCrudHandlers({
-  model: async () => (await import("@/models/Invoice")).default as any,
+  model: async () => (await import("@/models/Invoice")).default,
   modelName: "Invoice",
   permissions: {
-    list: PERMISSIONS.FINANCE_VIEW,
-    create: PERMISSIONS.INVOICE_CREATE,
+    list: PERMISSIONS.INVOICES_VIEW,
+    create: PERMISSIONS.INVOICES_POST,
   },
   searchFields: ["invoiceNumber"],
   populateFields: ["clientId", "projectId"],

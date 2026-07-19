@@ -2,12 +2,12 @@ import { createDetailHandlers } from "@/lib/route-handler";
 import { PERMISSIONS } from "@/lib/permissions";
 
 const handlers = createDetailHandlers({
-  model: async () => (await import("@/models/User")).default as any,
+  model: async () => (await import("@/models/User")).default,
   modelName: "User",
   permissions: {
-    get: PERMISSIONS.TEAM_VIEW,
-    update: PERMISSIONS.TEAM_MANAGE,
-    delete: PERMISSIONS.TEAM_MANAGE,
+    get: PERMISSIONS.USERS_VIEW,
+    update: PERMISSIONS.USERS_UPDATE,
+    delete: PERMISSIONS.USERS_DELETE,
   },
 });
 

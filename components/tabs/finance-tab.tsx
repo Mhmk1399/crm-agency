@@ -11,6 +11,8 @@ import type { ReportBadge } from "@/components/dashboard/report-badges";
 import type { FieldConfig } from "@/types/dynamic-form";
 import type { ColumnConfig } from "@/types/dynamic-table";
 import { useSession } from "@/lib/use-session";
+import { buildPermission } from "@/lib/permissions";
+import toast from "@/components/ui/toast";
 
 // ── Types ──
 interface Invoice { _id: string; invoiceNumber: string; currency: string; total: number; paidAmount: number; outstandingAmount: number; status: string; clientId?: string; projectId?: string; issuedDate: string; dueDate: string; notes?: string; [key: string]: unknown }
@@ -95,7 +97,7 @@ const opCategories = [
 // ── Sub-tab button ──
 function TabBtn({ label, active, onClick, count }: { label: string; active: boolean; onClick: () => void; count?: number }) {
   return (
-    <button onClick={onClick} className={`px-4 py-2 text-[13px] font-medium rounded-lg transition-all ${active ? "bg-primary text-white shadow-sm" : "text-muted hover:text-foreground hover:bg-muted-bg"}`}>
+    <button onClick={onClick} className={`shrink-0 whitespace-nowrap px-4 py-2 text-[13px] font-medium rounded-lg transition-all ${active ? "bg-primary text-white shadow-sm" : "text-muted hover:text-foreground hover:bg-muted-bg"}`}>
       {label}
       {count !== undefined && count > 0 && <span className="ml-1.5 bg-white/20 rounded-full px-1.5 text-[11px]">{count}</span>}
     </button>
@@ -104,8 +106,9 @@ function TabBtn({ label, active, onClick, count }: { label: string; active: bool
 
 // ── Main ──
 export default function FinanceTab() {
-  const { isAdmin, isFinance } = useSession();
+  const { isAdmin, isFinance, can } = useSession();
   const canManage = isAdmin || isFinance;
+  const canUpdateInvoices = can(buildPermission("invoices", "update"));
   const [subTab, setSubTab] = useState<SubTab>(canManage ? "reports" : "payments");
   const [statusInvoice, setStatusInvoice] = useState<Invoice | null>(null);
 
@@ -117,11 +120,11 @@ export default function FinanceTab() {
     queryKey: ["project-expenses-all"],
     queryFn: async () => { const r = await fetch("/api/project-expenses?limit=500"); const j = await r.json(); return j.success ? (j.data.data ?? []) : []; },
   });
-  const { data: projects = [] } = useQuery<Project[]>({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
     queryKey: ["projects"],
     queryFn: async () => { const r = await fetch("/api/projects?limit=200"); const j = await r.json(); return j.success ? (j.data.data ?? []) : []; },
   });
-  const { data: clients = [] } = useQuery<Client[]>({
+  const { data: clients = [], isLoading: clientsLoading } = useQuery<Client[]>({
     queryKey: ["clients"],
     queryFn: async () => { const r = await fetch("/api/clients?limit=200"); const j = await r.json(); return j.success ? (j.data.data ?? []) : []; },
   });
@@ -163,8 +166,8 @@ export default function FinanceTab() {
   const invoiceFields: FieldConfig[] = useMemo(() => [
     { name: "invoiceNumber", label: "Invoice #", type: "text" as const, required: true, placeholder: "INV-001" },
     { name: "currency", label: "Currency", type: "select" as const, required: true, options: CURRENCIES },
-    { name: "clientId", label: "Client", type: "searchselect" as const, placeholder: "Search clients...", options: clientOptions },
-    { name: "projectId", label: "Project", type: "searchselect" as const, placeholder: "Search projects...", options: projectOptions },
+    { name: "clientId", label: "Client", type: "searchselect" as const, placeholder: "Search clients...", options: clientOptions, optionsLoading: clientsLoading },
+    { name: "projectId", label: "Project", type: "searchselect" as const, placeholder: "Search projects...", options: projectOptions, optionsLoading: projectsLoading },
     { name: "subtotal", label: "Subtotal", type: "currency" as const, required: true },
     { name: "discount", label: "Discount", type: "currency" as const },
     { name: "tax", label: "Tax", type: "currency" as const },
@@ -172,7 +175,7 @@ export default function FinanceTab() {
     { name: "issuedDate", label: "Issue Date", type: "date" as const, required: true },
     { name: "dueDate", label: "Due Date", type: "date" as const, required: true },
     { name: "notes", label: "Notes", type: "textarea" as const, colSpan: 2 as const },
-  ], [clientOptions, projectOptions]);
+  ], [clientOptions, clientsLoading, projectOptions, projectsLoading]);
 
   const invoiceColumns: ColumnConfig<Invoice>[] = useMemo(() => [
     { key: "invoiceNumber", label: "#", sortable: true },
@@ -180,7 +183,7 @@ export default function FinanceTab() {
     { key: "currency", label: "Cur.", sortable: true, render: (v) => <Badge variant="default">{String(v)}</Badge> },
     { key: "status", label: "Status", sortable: true,
       render: (_v, row) => (
-        <button type="button" onClick={(e) => { e.stopPropagation(); setStatusInvoice(row); }} className="cursor-pointer">
+        <button type="button" onClick={(e) => { e.stopPropagation(); setStatusInvoice(row); }} className="cursor-pointer" disabled={!canUpdateInvoices}>
           <Badge variant={invStatusVariant[row.status] ?? "default"}>{row.status.replace(/_/g, " ")}</Badge>
         </button>
       ),
@@ -194,11 +197,11 @@ export default function FinanceTab() {
       const overdue = d < new Date();
       return <span className={overdue ? "text-destructive font-medium" : ""}>{d.toLocaleDateString()}</span>;
     }},
-  ], [clientMap]);
+  ], [clientMap, canUpdateInvoices]);
 
   // ── Payment fields ──
   const paymentFields: FieldConfig[] = useMemo(() => [
-    { name: "invoiceId", label: "Invoice", type: "searchselect" as const, required: true, placeholder: "Search invoices...", options: invoiceOptions },
+    { name: "invoiceId", label: "Invoice", type: "searchselect" as const, required: true, placeholder: "Search invoices...", options: invoiceOptions, optionsLoading: invoiceCrud.loading },
     { name: "currency", label: "Currency", type: "select" as const, required: true, options: CURRENCIES },
     { name: "amount", label: "Amount", type: "currency" as const, required: true },
     { name: "method", label: "Method", type: "select" as const, required: true, options: [
@@ -209,7 +212,7 @@ export default function FinanceTab() {
     { name: "reference", label: "Reference / Tracking #", type: "text" as const, placeholder: "Transaction reference" },
     { name: "paidAt", label: "Payment Date", type: "date" as const, required: true },
     { name: "notes", label: "Notes", type: "textarea" as const, colSpan: 2 as const },
-  ], [invoiceOptions]);
+  ], [invoiceOptions, invoiceCrud.loading]);
 
   const paymentColumns: ColumnConfig<Payment>[] = useMemo(() => [
     { key: "invoiceId", label: "Invoice", sortable: true, render: (v) => {
@@ -256,14 +259,14 @@ export default function FinanceTab() {
   }, [invoiceCrud.data]);
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 max-w-full space-y-6 overflow-x-hidden">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Finance</h1>
         <p className="text-[14px] text-muted mt-1">{canManage ? "Revenue, costs, and profitability across currencies" : "Your payments and salary information"}</p>
       </div>
 
       {/* Sub-tab navigation */}
-      <div className="flex items-center gap-1 bg-muted-bg rounded-lg p-1 w-fit">
+      <div className="dynamic-table-scroll flex w-full max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted-bg p-1 sm:w-fit">
         {canManage && <TabBtn label="Reports" active={subTab === "reports"} onClick={() => setSubTab("reports")} />}
         {canManage && <TabBtn label="Invoices" active={subTab === "invoices"} onClick={() => setSubTab("invoices")} count={invoiceCrud.data.length} />}
         <TabBtn label="Payments" active={subTab === "payments"} onClick={() => setSubTab("payments")} count={paymentCrud.data.length} />
@@ -358,6 +361,7 @@ export default function FinanceTab() {
             onDelete={(id) => invoiceCrud.remove(id)}
             addLabel="+ New Invoice"
             nameKey="invoiceNumber"
+            accessResource="invoices"
           />
           <StatusPicker
             open={statusInvoice !== null}
@@ -367,6 +371,11 @@ export default function FinanceTab() {
             options={invStatusOptions}
             onSelect={async (newStatus) => {
               if (!statusInvoice) return;
+              if (!canUpdateInvoices) {
+                toast.error("You do not have permission to update invoices.");
+                setStatusInvoice(null);
+                return;
+              }
               const body: Record<string, unknown> = { status: newStatus };
               if (newStatus === "paid") body.paidAt = new Date().toISOString();
               await invoiceCrud.update(statusInvoice._id, body);
@@ -392,6 +401,7 @@ export default function FinanceTab() {
           onDelete={(id) => paymentCrud.remove(id)}
           addLabel="+ Record Payment"
           nameKey="reference"
+          accessResource="payments"
         />
       )}
 
@@ -410,6 +420,7 @@ export default function FinanceTab() {
           onDelete={(id) => opExpenseCrud.remove(id)}
           addLabel="+ Add Expense"
           nameKey="description"
+          accessResource="operational-expenses"
         />
       )}
     </div>

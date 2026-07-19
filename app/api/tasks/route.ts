@@ -2,10 +2,10 @@ import { createCrudHandlers } from "@/lib/route-handler";
 import { PERMISSIONS } from "@/lib/permissions";
 
 const handlers = createCrudHandlers({
-  model: async () => (await import("@/models/Task")).default as any,
+  model: async () => (await import("@/models/Task")).default,
   modelName: "Task",
   permissions: {
-    list: PERMISSIONS.TASK_CREATE,
+    list: PERMISSIONS.TASK_VIEW,
     create: PERMISSIONS.TASK_CREATE,
   },
   searchFields: ["title"],

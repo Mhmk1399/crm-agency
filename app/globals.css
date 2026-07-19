@@ -70,9 +70,16 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
+  max-width: 100%;
+  overflow-x: hidden;
   font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -87,9 +94,17 @@ body {
 }
 
 select,
+textarea,
+input,
 select option {
   background-color: var(--background);
   color: var(--foreground);
+}
+
+input,
+textarea,
+select {
+  font-size: 16px !important;
 }
 
 select option:checked {
@@ -107,4 +122,54 @@ select option:hover {
 
 *::-webkit-scrollbar {
   display: none;
+}
+
+.dynamic-select-options {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) transparent;
+}
+
+.dynamic-select-options::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+}
+
+.dynamic-select-options::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dynamic-select-options::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 999px;
+}
+
+.dynamic-table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) transparent;
+}
+
+.dynamic-table-scroll::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+  height: 6px;
+}
+
+.dynamic-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dynamic-table-scroll::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 999px;
+}
+
+.modal-body:has(.dynamic-form-shell) {
+  display: flex;
+  overflow: hidden;
+  padding: 0;
+}
+
+.modal-body:has(.dynamic-form-shell) > .dynamic-form-shell {
+  flex: 1;
+  min-height: 0;
 }

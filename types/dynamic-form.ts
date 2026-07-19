@@ -22,6 +22,7 @@ export type FieldType =
 export interface SelectOption {
   label: string;
   value: string;
+  description?: string;
 }
 
 export interface FieldConfig {
@@ -33,6 +34,10 @@ export interface FieldConfig {
   required?: boolean;
   disabled?: boolean;
   options?: SelectOption[];
+  optionsLoading?: boolean;
+  optionsError?: string;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
   defaultValue?: unknown;
   colSpan?: 1 | 2;
   min?: number;

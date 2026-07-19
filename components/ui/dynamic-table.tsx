@@ -106,20 +106,20 @@ export default function DynamicTable<T extends { _id?: string; id?: string }>({
     col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left";
 
   return (
-    <div className="glass rounded-[var(--radius-lg)] overflow-hidden">
+    <div className="glass w-full min-w-0 max-w-full overflow-hidden rounded-[var(--radius-lg)]">
       {/* Header */}
       {(title || description || searchable || headerAction) && (
-        <div className="px-6 pt-6 pb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            {title && <h2 className="text-xl font-semibold text-foreground">{title}</h2>}
-            {description && <p className="mt-0.5 text-[14px] text-muted">{description}</p>}
+        <div className="flex flex-col gap-4 px-4 pt-5 pb-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:pt-6">
+          <div className="min-w-0 max-w-full">
+            {title && <h2 className="break-words text-xl font-semibold text-foreground">{title}</h2>}
+            {description && <p className="mt-0.5 break-words text-[14px] text-muted">{description}</p>}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end sm:gap-3">
             {searchable && (
-              <div className="relative">
+              <div className="relative w-full sm:w-64">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"><SearchIcon /></span>
                 <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} placeholder={searchPlaceholder}
-                  className="w-full sm:w-64 rounded-[var(--radius-sm)] bg-input-bg pl-9 pr-4 py-2.5 text-[14px] text-foreground border border-input-border outline-none placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-input-focus transition-all duration-200" />
+                  className="w-full min-w-0 rounded-[var(--radius-sm)] bg-input-bg pl-9 pr-4 py-2.5 text-base text-foreground border border-input-border outline-none placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-input-focus transition-all duration-200" />
               </div>
             )}
             {headerAction}
@@ -128,8 +128,8 @@ export default function DynamicTable<T extends { _id?: string; id?: string }>({
       )}
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
+      <div className="dynamic-table-scroll w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+        <table className="w-full min-w-[680px] table-fixed">
           <thead className="sticky top-0 z-10">
             <tr className="bg-[var(--background)] border-y-2 border-separator">
               {columns.map((col) => (
@@ -137,18 +137,18 @@ export default function DynamicTable<T extends { _id?: string; id?: string }>({
                   key={col.key}
                   onClick={() => handleSort(col)}
                   style={{ width: col.width }}
-                  className={`px-4 py-3.5 text-[11px] font-bold uppercase tracking-[0.08em] text-muted/80 whitespace-nowrap ${
+                  className={`overflow-hidden px-4 py-3.5 text-[11px] font-bold uppercase tracking-[0.08em] text-muted/80 whitespace-nowrap ${
                     col.sortable ? "cursor-pointer select-none hover:text-foreground transition-colors" : ""
                   } ${col.hideOnMobile ? "hidden sm:table-cell" : ""} ${tdAlign(col)}`}
                 >
-                  <span className={`inline-flex items-center gap-1.5 ${thAlign(col)}`}>
-                    {col.label}
+                  <span className={`inline-flex max-w-full min-w-0 items-center gap-1.5 ${thAlign(col)}`}>
+                    <span className="truncate">{col.label}</span>
                     {col.sortable && sort?.key === col.key && <ChevronIcon direction={sort.direction === "asc" ? "up" : "down"} />}
                   </span>
                 </th>
               ))}
               {hasActions && (
-                <th className="px-4 py-3.5 text-right text-[11px] font-bold uppercase tracking-[0.08em] text-muted/80" style={{ width: "auto" }} />
+                <th className="px-4 py-3.5 text-right text-[11px] font-bold uppercase tracking-[0.08em] text-muted/80" style={{ width: "112px" }} />
               )}
             </tr>
           </thead>
@@ -167,11 +167,13 @@ export default function DynamicTable<T extends { _id?: string; id?: string }>({
                   {columns.map((col) => (
                     <td
                       key={col.key}
-                      className={`px-4 py-3.5 text-[14px] text-foreground whitespace-nowrap ${
+                      className={`overflow-hidden px-4 py-3.5 text-[14px] text-foreground whitespace-nowrap ${
                         col.hideOnMobile ? "hidden sm:table-cell" : ""
                       } ${tdAlign(col)}`}
                     >
-                      {col.render ? col.render(row[col.key], row) : row[col.key] == null ? "—" : String(row[col.key])}
+                      <div className={`min-w-0 overflow-hidden text-ellipsis ${col.align === "right" ? "flex justify-end" : col.align === "center" ? "flex justify-center" : ""}`}>
+                        {col.render ? col.render(row[col.key], row) : row[col.key] == null ? "—" : String(row[col.key])}
+                      </div>
                     </td>
                   ))}
                   {hasActions && (
@@ -205,13 +207,13 @@ export default function DynamicTable<T extends { _id?: string; id?: string }>({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="px-6 py-4 border-t border-separator flex items-center justify-between">
+        <div className="flex flex-col gap-3 border-t border-separator px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p className="text-[13px] text-muted">
             {sorted.length === 0 ? "No results" : `${safeCurrentPage * pageSize + 1}–${Math.min((safeCurrentPage + 1) * pageSize, sorted.length)} of ${sorted.length}`}
           </p>
-          <div className="flex items-center gap-1">
+          <div className="dynamic-table-scroll flex max-w-full items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
             <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safeCurrentPage === 0}
-              className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-foreground bg-input-bg border border-input-border hover:bg-muted-bg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed">
+              className="shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-medium text-foreground bg-input-bg border border-input-border hover:bg-muted-bg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed">
               Previous
             </button>
             {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
@@ -222,13 +224,13 @@ export default function DynamicTable<T extends { _id?: string; id?: string }>({
               else pageNum = safeCurrentPage - 2 + i;
               return (
                 <button key={pageNum} onClick={() => setPage(pageNum)}
-                  className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-200 min-w-[36px] ${safeCurrentPage === pageNum ? "bg-primary text-white shadow-sm" : "text-foreground hover:bg-muted-bg"}`}>
+                  className={`min-w-[36px] shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-200 ${safeCurrentPage === pageNum ? "bg-primary text-white shadow-sm" : "text-foreground hover:bg-muted-bg"}`}>
                   {pageNum + 1}
                 </button>
               );
             })}
             <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={safeCurrentPage === totalPages - 1}
-              className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-foreground bg-input-bg border border-input-border hover:bg-muted-bg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed">
+              className="shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-medium text-foreground bg-input-bg border border-input-border hover:bg-muted-bg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed">
               Next
             </button>
           </div>

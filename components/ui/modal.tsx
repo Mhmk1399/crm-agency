@@ -12,10 +12,10 @@ interface ModalProps {
 }
 
 const sizeClasses = {
-  sm: "max-w-md",
-  md: "max-w-lg",
-  lg: "max-w-2xl",
-  xl: "max-w-4xl",
+  sm: "sm:max-w-md",
+  md: "sm:max-w-lg",
+  lg: "sm:max-w-2xl",
+  xl: "sm:max-w-4xl",
 };
 
 export default function Modal({
@@ -54,26 +54,28 @@ export default function Modal({
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-stretch justify-center overflow-hidden bg-black/30 backdrop-blur-sm animate-in fade-in duration-200 sm:items-center sm:p-4"
     >
       <div
-        className={`glass rounded-[var(--radius-lg)] w-full ${sizeClasses[size]} shadow-xl max-h-[90vh] overflow-y-auto`}
+        className={`glass flex h-dvh w-screen min-w-0 max-w-none flex-col overflow-hidden rounded-none border-0 shadow-xl sm:h-auto sm:max-h-[90vh] sm:w-full sm:rounded-[var(--radius-lg)] sm:border ${sizeClasses[size]}`}
       >
         {(title || description) && (
-          <div className="flex items-start justify-between px-6 pt-6 pb-2">
-            <div>
+          <div className="sticky top-0 z-20 flex shrink-0 items-start justify-between gap-3 border-b border-separator bg-card/95 px-4 py-4 backdrop-blur-[var(--blur)] sm:px-6 sm:py-5">
+            <div className="min-w-0">
               {title && (
-                <h3 className="text-lg font-semibold text-foreground">
+                <h3 className="break-words text-[18px] font-semibold leading-snug text-foreground">
                   {title}
                 </h3>
               )}
               {description && (
-                <p className="mt-0.5 text-[14px] text-muted">{description}</p>
+                <p className="mt-0.5 break-words text-[14px] text-muted">{description}</p>
               )}
             </div>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-muted hover:text-foreground hover:bg-muted-bg transition-all duration-200"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:text-foreground hover:bg-muted-bg transition-all duration-200"
+              aria-label="Close modal"
+              type="button"
             >
               <svg
                 width="18"
@@ -91,7 +93,9 @@ export default function Modal({
             </button>
           </div>
         )}
-        <div className="px-6 pb-6">{children}</div>
+        <div className="modal-body dynamic-table-scroll min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 sm:px-6 sm:py-6">
+          {children}
+        </div>
       </div>
     </div>
   );

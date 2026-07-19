@@ -80,9 +80,10 @@ export async function requireAuthWithPermission(
   permission: string
 ): Promise<SessionPayload> {
   const session = await requireAuth();
-  const { requirePermission } = await import("./permissions");
-  requirePermission({
+  const { requirePermission } = await import("./permission-store");
+  await requirePermission({
     role: session.role,
+    organisationId: session.organisationId,
     permission: permission as import("./permissions").Permission,
   });
   return session;

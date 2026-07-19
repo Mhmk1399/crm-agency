@@ -21,14 +21,14 @@ const variantStyles = {
 export default function ReportBadges({ badges }: ReportBadgesProps) {
   if (badges.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex w-full min-w-0 max-w-full flex-wrap gap-2">
       {badges.map((b) => (
         <div
           key={b.label}
-          className={`glass rounded-[var(--radius-sm)] px-4 py-2.5 border flex items-center gap-2.5 ${variantStyles[b.variant ?? "default"]}`}
+          className={`glass flex min-w-0 max-w-full items-center gap-2.5 rounded-[var(--radius-sm)] border px-4 py-2.5 ${variantStyles[b.variant ?? "default"]}`}
         >
-          <span className="text-[12px] font-medium opacity-70">{b.label}</span>
-          <span className="text-[16px] font-bold leading-none">{b.value}</span>
+          <span className="min-w-0 truncate text-[12px] font-medium opacity-70">{b.label}</span>
+          <span className="shrink-0 text-[16px] font-bold leading-none">{b.value}</span>
         </div>
       ))}
     </div>

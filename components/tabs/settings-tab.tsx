@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
+import toast from "@/components/ui/toast";
 import Badge from "@/components/ui/badge";
+import DynamicSelect from "@/components/ui/dynamic-select";
 
 interface Organisation {
   _id: string; name: string; slug: string; domain?: string; logo?: string;
@@ -28,18 +29,32 @@ function SectionBtn({ label, active, onClick, icon }: { label: string; active: b
 
 function Field({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-4 border-b border-separator last:border-0">
-      <div className="sm:max-w-[50%]">
+    <div className="flex min-w-0 flex-col justify-between gap-2 border-b border-separator py-4 last:border-0 sm:flex-row sm:items-center">
+      <div className="min-w-0 sm:max-w-[50%]">
         <p className="text-[13px] font-medium text-foreground">{label}</p>
         {description && <p className="text-[11px] text-muted mt-0.5">{description}</p>}
       </div>
-      <div className="sm:w-[45%]">{children}</div>
+      <div className="min-w-0 sm:w-[45%]">{children}</div>
     </div>
   );
 }
 
-const inputClass = "w-full rounded-lg bg-input-bg px-3 py-2.5 text-[14px] text-foreground border border-input-border outline-none placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-input-focus transition-all";
-const selectClass = inputClass;
+const inputClass = "w-full rounded-lg bg-input-bg px-3 py-2.5 text-base text-foreground border border-input-border outline-none placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-input-focus transition-all";
+
+const currencyOptions = [
+  { label: "Toman (IRR)", value: "IRR" },
+  { label: "US Dollar (USD)", value: "USD" },
+  { label: "British Pound (GBP)", value: "GBP" },
+];
+
+const timezoneOptions = [
+  { label: "Asia/Tehran (IRST)", value: "Asia/Tehran" },
+  { label: "UTC", value: "UTC" },
+  { label: "Europe/London (GMT/BST)", value: "Europe/London" },
+  { label: "America/New York (EST)", value: "America/New_York" },
+  { label: "Europe/Berlin (CET)", value: "Europe/Berlin" },
+  { label: "Asia/Dubai (GST)", value: "Asia/Dubai" },
+];
 
 export default function SettingsTab() {
   const qc = useQueryClient();
@@ -74,6 +89,7 @@ export default function SettingsTab() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!org) return;
     setName(org.name);
@@ -87,6 +103,7 @@ export default function SettingsTab() {
     setSplitInternal(org.settings.capacitySplit.internal);
     setSplitBuffer(org.settings.capacitySplit.buffer);
   }, [org]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const saveMut = useMutation({
     mutationFn: async (body: Record<string, unknown>) => {
@@ -137,13 +154,13 @@ export default function SettingsTab() {
   const splitTotal = splitDelivery + splitSales + splitInternal + splitBuffer;
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 max-w-full space-y-6 overflow-x-hidden">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-[14px] text-muted mt-1">Organisation configuration and account settings</p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
+      <div className="flex min-w-0 flex-col gap-6 lg:flex-row">
         {/* Left nav */}
         <div className="w-full lg:w-56 shrink-0 space-y-1">
           <SectionBtn label="Organisation" active={section === "profile"} onClick={() => setSection("profile")}
@@ -155,7 +172,7 @@ export default function SettingsTab() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 glass rounded-[var(--radius-lg)] overflow-hidden">
+        <div className="glass min-w-0 flex-1 overflow-hidden rounded-[var(--radius-lg)]">
 
           {/* ═══ ORGANISATION PROFILE ═══ */}
           {section === "profile" && (
@@ -185,7 +202,7 @@ export default function SettingsTab() {
               </div>
               <div className="px-6 py-4 border-t border-separator flex justify-end">
                 <button onClick={saveProfile} disabled={saveMut.isPending}
-                  className="rounded-lg bg-primary hover:bg-primary-hover text-white px-5 py-2.5 text-[13px] font-semibold transition-all disabled:opacity-50">
+                  className="w-full rounded-lg bg-primary hover:bg-primary-hover text-white px-5 py-2.5 text-[13px] font-semibold transition-all disabled:opacity-50 sm:w-auto">
                   {saveMut.isPending ? "Saving..." : "Save Changes"}
                 </button>
               </div>
@@ -201,21 +218,24 @@ export default function SettingsTab() {
               </div>
               <div className="px-6 py-2">
                 <Field label="Default Currency" description="Used as the default when creating invoices and expenses">
-                  <select value={currency} onChange={e => setCurrency(e.target.value)} className={selectClass}>
-                    <option value="IRR">Toman (IRR)</option>
-                    <option value="USD">US Dollar (USD)</option>
-                    <option value="GBP">British Pound (GBP)</option>
-                  </select>
+                  <DynamicSelect
+                    clearable={false}
+                    options={currencyOptions}
+                    placeholder="Select currency"
+                    searchPlaceholder="Search currency..."
+                    value={currency}
+                    onChange={setCurrency}
+                  />
                 </Field>
                 <Field label="Timezone" description="Used for date calculations and reports">
-                  <select value={timezone} onChange={e => setTimezone(e.target.value)} className={selectClass}>
-                    <option value="Asia/Tehran">Asia/Tehran (IRST)</option>
-                    <option value="UTC">UTC</option>
-                    <option value="Europe/London">Europe/London (GMT/BST)</option>
-                    <option value="America/New_York">America/New York (EST)</option>
-                    <option value="Europe/Berlin">Europe/Berlin (CET)</option>
-                    <option value="Asia/Dubai">Asia/Dubai (GST)</option>
-                  </select>
+                  <DynamicSelect
+                    clearable={false}
+                    options={timezoneOptions}
+                    placeholder="Select timezone"
+                    searchPlaceholder="Search timezone..."
+                    value={timezone}
+                    onChange={setTimezone}
+                  />
                 </Field>
                 <Field label="Working Hours / Week" description="Default weekly capacity for new team members">
                   <div className="flex items-center gap-2">
@@ -259,7 +279,7 @@ export default function SettingsTab() {
               </div>
               <div className="px-6 py-4 border-t border-separator flex justify-end">
                 <button onClick={saveDefaults} disabled={saveMut.isPending || splitTotal !== 100}
-                  className="rounded-lg bg-primary hover:bg-primary-hover text-white px-5 py-2.5 text-[13px] font-semibold transition-all disabled:opacity-50">
+                  className="w-full rounded-lg bg-primary hover:bg-primary-hover text-white px-5 py-2.5 text-[13px] font-semibold transition-all disabled:opacity-50 sm:w-auto">
                   {saveMut.isPending ? "Saving..." : "Save Defaults"}
                 </button>
               </div>
@@ -291,7 +311,7 @@ export default function SettingsTab() {
                 <button
                   onClick={() => passwordMut.mutate()}
                   disabled={passwordMut.isPending || !currentPassword || !newPassword || newPassword !== confirmPassword}
-                  className="rounded-lg bg-primary hover:bg-primary-hover text-white px-5 py-2.5 text-[13px] font-semibold transition-all disabled:opacity-50">
+                  className="w-full rounded-lg bg-primary hover:bg-primary-hover text-white px-5 py-2.5 text-[13px] font-semibold transition-all disabled:opacity-50 sm:w-auto">
                   {passwordMut.isPending ? "Changing..." : "Change Password"}
                 </button>
               </div>

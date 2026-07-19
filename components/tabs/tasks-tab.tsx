@@ -9,7 +9,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import { z } from "zod/v4";
 import type { FieldValues } from "react-hook-form";
-import toast from "react-hot-toast";
+import toast from "@/components/ui/toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Badge from "@/components/ui/badge";
 import Button from "@/components/ui/button";
@@ -20,6 +20,7 @@ import ReportBadges, { type ReportBadge } from "@/components/dashboard/report-ba
 import DynamicForm from "@/components/ui/dynamic-form";
 import StatusPicker, { type StatusOption } from "@/components/ui/status-picker";
 import { useSession } from "@/lib/use-session";
+import { PERMISSIONS } from "@/lib/permissions";
 import type { FieldConfig } from "@/types/dynamic-form";
 
 const taskStatusOptions: StatusOption[] = [
@@ -269,10 +270,10 @@ function SortableTaskCard({ task, onClickTask, userMap, userOptions, projectMap,
   task: Task; onClickTask: (t: Task) => void;
   userMap: Map<string, string>; userOptions: { label: string; value: string }[];
   projectMap: Map<string, string>; milestoneMap: Map<string, string>;
-  onAssign: (taskId: string, userIds: string[]) => void;
-  onEdit: (task: Task) => void;
-  onDelete: (task: Task) => void;
-  onStatusChange: (task: Task) => void;
+  onAssign?: (taskId: string, userIds: string[]) => void;
+  onEdit?: (task: Task) => void;
+  onDelete?: (task: Task) => void;
+  onStatusChange?: (task: Task) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task._id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 };
@@ -286,14 +287,15 @@ function SortableTaskCard({ task, onClickTask, userMap, userOptions, projectMap,
 // --- Droppable column with pagination ---
 const COLUMN_PAGE_SIZE = 8;
 
-function KanbanColumn({ column, onAddTask, onDoubleClick, onClickTask, userMap, userOptions, projectMap, milestoneMap, onAssign, onEdit, onDelete, onStatusChange }: {
+function KanbanColumn({ column, onAddTask, canAddTask, onDoubleClick, onClickTask, userMap, userOptions, projectMap, milestoneMap, onAssign, onEdit, onDelete, onStatusChange }: {
   column: Column; onAddTask: (status: string) => void;
+  canAddTask?: boolean;
   onDoubleClick: (colId: string) => void; onClickTask: (t: Task) => void;
   userMap: Map<string, string>; userOptions: { label: string; value: string }[];
   projectMap: Map<string, string>; milestoneMap: Map<string, string>;
-  onAssign: (taskId: string, userIds: string[]) => void;
-  onStatusChange: (task: Task) => void;
-  onEdit: (task: Task) => void; onDelete: (task: Task) => void;
+  onAssign?: (taskId: string, userIds: string[]) => void;
+  onStatusChange?: (task: Task) => void;
+  onEdit?: (task: Task) => void; onDelete?: (task: Task) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const [visibleCount, setVisibleCount] = useState(COLUMN_PAGE_SIZE);
@@ -310,9 +312,11 @@ function KanbanColumn({ column, onAddTask, onDoubleClick, onClickTask, userMap, 
           <h3 className="text-[13px] font-semibold text-foreground">{column.title}</h3>
           <span className="text-[11px] text-muted bg-muted-bg rounded-full px-2 py-0.5">{column.tasks.length}</span>
         </div>
-        <button onClick={(e) => { e.stopPropagation(); onAddTask(column.id); }} className="text-muted hover:text-primary transition-colors p-1">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-        </button>
+        {canAddTask && (
+          <button onClick={(e) => { e.stopPropagation(); onAddTask(column.id); }} className="text-muted hover:text-primary transition-colors p-1">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+          </button>
+        )}
       </div>
       <div
         ref={setNodeRef}
@@ -355,13 +359,13 @@ function KanbanColumn({ column, onAddTask, onDoubleClick, onClickTask, userMap, 
 function FullscreenColumn({ column, onClose, onClickTask }: { column: Column; onClose: () => void; onClickTask: (t: Task) => void }) {
   return (
     <div className="fixed inset-0 z-50 bg-[var(--background)] flex flex-col">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-separator">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-3 border-b border-separator px-4 py-4 sm:items-center sm:px-6">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: column.color }} />
-          <h2 className="text-xl font-bold text-foreground">{column.title}</h2>
-          <span className="text-[13px] text-muted bg-muted-bg rounded-full px-3 py-1">{column.tasks.length} tasks</span>
+          <h2 className="min-w-0 text-xl font-bold text-foreground">{column.title}</h2>
+          <span className="shrink-0 text-[13px] text-muted bg-muted-bg rounded-full px-3 py-1">{column.tasks.length} tasks</span>
         </div>
-        <button onClick={onClose} className="rounded-lg p-2 text-muted hover:text-foreground hover:bg-muted-bg transition-all">
+        <button onClick={onClose} className="shrink-0 rounded-lg p-2 text-muted hover:text-foreground hover:bg-muted-bg transition-all">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 6 6 18" /><path d="m6 6 12 12" />
           </svg>
@@ -384,7 +388,7 @@ function FullscreenColumn({ column, onClose, onClickTask }: { column: Column; on
 // --- Main component ---
 export default function TasksTab() {
   const qc = useQueryClient();
-  const { session, isAdmin } = useSession();
+  const { can } = useSession();
   const [modalOpen, setModalOpen] = useState(false);
   const [newTaskStatus, setNewTaskStatus] = useState("backlog");
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -396,6 +400,9 @@ export default function TasksTab() {
   const [localTasks, setLocalTasks] = useState<Task[] | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const canCreateTask = can(PERMISSIONS.TASKS_POST);
+  const canUpdateTask = can(PERMISSIONS.TASKS_UPDATE);
+  const canDeleteTask = can(PERMISSIONS.TASKS_DELETE);
 
   const { data: fetchedTasks = [], isLoading } = useQuery<Task[]>({
     queryKey: ["tasks"],
@@ -406,18 +413,17 @@ export default function TasksTab() {
     },
   });
 
-  const { data: projects = [] } = useQuery<Project[]>({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
     queryKey: ["projects"],
     queryFn: async () => { const r = await fetch("/api/projects?limit=100"); const j = await r.json(); return j.success ? (j.data.data ?? []) : []; },
   });
 
-  const { data: users = [] } = useQuery<User[]>({
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["users"],
     queryFn: async () => { const r = await fetch("/api/users?limit=100"); const j = await r.json(); return j.success ? (j.data.data ?? []) : []; },
   });
 
-  const allTasks = localTasks ?? fetchedTasks;
-  const tasks = isAdmin ? allTasks : allTasks.filter(t => t.assigneeIds?.includes(session?.userId ?? ""));
+  const tasks = localTasks ?? fetchedTasks;
 
   const { data: milestones = [] } = useQuery<{ _id: string; title: string; projectId: string }[]>({
     queryKey: ["project-milestones-all"],
@@ -432,8 +438,8 @@ export default function TasksTab() {
 
   const taskFields: FieldConfig[] = useMemo(() => [
     { name: "title", label: "Task Title", type: "text" as const, required: true, colSpan: 2 as const, placeholder: "What needs to be done?" },
-    { name: "projectId", label: "Project", type: "searchselect" as const, placeholder: "Search projects...", options: projectOptions },
-    { name: "reviewerId", label: "Reviewer", type: "searchselect" as const, placeholder: "Search team...", options: userOptions },
+    { name: "projectId", label: "Project", type: "searchselect" as const, placeholder: "Search projects...", options: projectOptions, optionsLoading: projectsLoading },
+    { name: "reviewerId", label: "Reviewer", type: "searchselect" as const, placeholder: "Search team...", options: userOptions, optionsLoading: usersLoading },
     { name: "priority", label: "Priority", type: "select" as const, required: true, options: [
       { label: "Urgent", value: "urgent" }, { label: "High", value: "high" },
       { label: "Medium", value: "medium" }, { label: "Low", value: "low" },
@@ -454,7 +460,7 @@ export default function TasksTab() {
     { name: "blockedReason", label: "Blocked Reason", type: "text" as const, placeholder: "If blocked, why?" },
     { name: "tags", label: "Tags", type: "text" as const, placeholder: "Comma separated", description: "Separate with commas" },
     { name: "description", label: "Description", type: "textarea" as const, colSpan: 2 as const, placeholder: "Detailed description..." },
-  ], [projectOptions, userOptions]);
+  ], [projectOptions, projectsLoading, userOptions, usersLoading]);
 
   const columns: Column[] = useMemo(() =>
     COLUMNS.map(col => ({
@@ -470,16 +476,18 @@ export default function TasksTab() {
       if (!json.success) throw new Error(json.error?.message ?? "Update failed");
       return json.data;
     },
-    onSuccess: () => { setLocalTasks(null); qc.invalidateQueries({ queryKey: ["tasks"] }); },
-    onError: (e: Error) => { toast.error(e.message); setLocalTasks(null); qc.invalidateQueries({ queryKey: ["tasks"] }); },
+    onSuccess: () => { setLocalTasks(null); qc.invalidateQueries({ queryKey: ["tasks"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); },
+    onError: (e: Error) => { toast.error(e.message); setLocalTasks(null); qc.invalidateQueries({ queryKey: ["tasks"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); },
   });
 
   function handleDragStart(event: DragStartEvent) {
+    if (!canUpdateTask) return;
     const task = tasks.find(t => t._id === event.active.id);
     setActiveTask(task ?? null);
   }
 
   function handleDragOver(event: DragOverEvent) {
+    if (!canUpdateTask) return;
     const { active, over } = event;
     if (!over) return;
 
@@ -502,6 +510,10 @@ export default function TasksTab() {
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    if (!canUpdateTask) {
+      setActiveTask(null);
+      return;
+    }
     setActiveTask(null);
     const { active, over } = event;
     if (!over) { setLocalTasks(null); return; }
@@ -519,6 +531,10 @@ export default function TasksTab() {
   }
 
   const handleCreateTask = useCallback(async (data: FieldValues) => {
+    if (!canCreateTask) {
+      toast.error("You do not have permission to create tasks.");
+      return;
+    }
     try {
       const tags = typeof data.tags === "string" ? data.tags.split(",").map((t: string) => t.trim()).filter(Boolean) : [];
       const res = await fetch("/api/tasks", {
@@ -531,8 +547,9 @@ export default function TasksTab() {
       toast.success("Task created");
       setModalOpen(false);
       qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     } catch { toast.error("Network error"); }
-  }, [newTaskStatus, tasks, qc]);
+  }, [canCreateTask, newTaskStatus, tasks, qc]);
 
   const fullscreenColumn = fullscreenCol ? columns.find(c => c.id === fullscreenCol) ?? null : null;
 
@@ -584,24 +601,27 @@ export default function TasksTab() {
       if (!json.success) { toast.error(json.error?.message ?? "Delete failed"); return; }
       toast.success("Task deleted");
       qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     } catch { toast.error("Network error"); }
     setDeleteTarget(null);
   }, [deleteTarget, qc]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="w-full min-w-0 max-w-full space-y-6 overflow-x-hidden">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-foreground">Tasks</h1>
           <p className="text-[14px] text-muted mt-1">Drag tasks between columns — double-click a column to expand</p>
         </div>
-        <Button onClick={() => { setNewTaskStatus("backlog"); setModalOpen(true); }}>+ New Task</Button>
+        {canCreateTask && (
+          <Button className="w-full whitespace-nowrap sm:w-auto" onClick={() => { setNewTaskStatus("backlog"); setModalOpen(true); }}>+ New Task</Button>
+        )}
       </div>
 
       <ReportBadges badges={badges} />
 
       {isLoading ? (
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="dynamic-table-scroll flex w-full min-w-0 max-w-full gap-4 overflow-x-auto pb-4">
           {COLUMNS.map(col => (
             <div key={col.id} className="w-72 shrink-0">
               <div className="h-4 w-24 bg-muted-bg rounded-md animate-pulse mb-3" />
@@ -612,7 +632,7 @@ export default function TasksTab() {
           ))}
         </div>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="dynamic-table-scroll flex w-full min-w-0 max-w-full gap-4 overflow-x-auto pb-4">
           <DndContext
             sensors={sensors}
             onDragStart={handleDragStart}
@@ -623,17 +643,25 @@ export default function TasksTab() {
               <KanbanColumn
                 key={col.id}
                 column={col}
-                onAddTask={(status) => { setNewTaskStatus(status); setModalOpen(true); }}
+                canAddTask={canCreateTask}
+                onAddTask={(status) => {
+                  if (!canCreateTask) {
+                    toast.error("You do not have permission to create tasks.");
+                    return;
+                  }
+                  setNewTaskStatus(status);
+                  setModalOpen(true);
+                }}
                 onDoubleClick={(colId) => setFullscreenCol(colId)}
                 onClickTask={(t) => setViewTask(t)}
                 userMap={userMap}
                 userOptions={userOptions}
                 projectMap={projectMap}
                 milestoneMap={milestoneMap}
-                onAssign={handleAssign}
-                onStatusChange={(t) => setStatusTask(t)}
-                onEdit={(t) => setEditingTask(t)}
-                onDelete={(t) => setDeleteTarget(t)}
+                onAssign={canUpdateTask ? handleAssign : undefined}
+                onStatusChange={canUpdateTask ? (t) => setStatusTask(t) : undefined}
+                onEdit={canUpdateTask ? (t) => setEditingTask(t) : undefined}
+                onDelete={canDeleteTask ? (t) => setDeleteTarget(t) : undefined}
               />
             ))}
             <DragOverlay dropAnimation={null}>

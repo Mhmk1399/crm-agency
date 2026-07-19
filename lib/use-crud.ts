@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
+import toast from "@/components/ui/toast";
 
 interface UseCrudOptions {
   endpoint: string;
@@ -28,7 +28,10 @@ export function useCrud<T extends { _id: string }>({ endpoint, label, limit = 10
     },
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
+  };
 
   const createMutation = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
@@ -38,7 +41,10 @@ export function useCrud<T extends { _id: string }>({ endpoint, label, limit = 10
         body: JSON.stringify(body),
       }),
     onSuccess: () => { toast.success(`${label} created`); invalidate(); },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      toast.error(e.message);
+      (e as Error & { toastShown?: boolean }).toastShown = true;
+    },
   });
 
   const updateMutation = useMutation({
@@ -49,14 +55,20 @@ export function useCrud<T extends { _id: string }>({ endpoint, label, limit = 10
         body: JSON.stringify(body),
       }),
     onSuccess: () => { toast.success(`${label} updated`); invalidate(); },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      toast.error(e.message);
+      (e as Error & { toastShown?: boolean }).toastShown = true;
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) =>
       fetchApi(`/api/${endpoint}/${id}`, { method: "DELETE" }),
     onSuccess: () => { toast.success(`${label} deleted`); invalidate(); },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      toast.error(e.message);
+      (e as Error & { toastShown?: boolean }).toastShown = true;
+    },
   });
 
   const create = async (body: Record<string, unknown>) => {

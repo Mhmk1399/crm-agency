@@ -2,12 +2,12 @@ import { createDetailHandlers } from "@/lib/route-handler";
 import { PERMISSIONS } from "@/lib/permissions";
 
 const handlers = createDetailHandlers({
-  model: async () => (await import("@/models/ProjectMilestone")).default as any,
+  model: async () => (await import("@/models/ProjectMilestone")).default,
   modelName: "ProjectMilestone",
   permissions: {
-    get: PERMISSIONS.PROJECT_VIEW,
-    update: PERMISSIONS.PROJECT_UPDATE,
-    delete: PERMISSIONS.PROJECT_UPDATE,
+    get: PERMISSIONS.PROJECT_MILESTONES_VIEW,
+    update: PERMISSIONS.PROJECT_MILESTONES_UPDATE,
+    delete: PERMISSIONS.PROJECT_MILESTONES_DELETE,
   },
   populateFields: [],
 });

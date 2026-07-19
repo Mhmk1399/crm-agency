@@ -2,10 +2,10 @@ import { createDetailHandlers } from "@/lib/route-handler";
 import { PERMISSIONS } from "@/lib/permissions";
 
 const handlers = createDetailHandlers({
-  model: async () => (await import("@/models/Payment")).default as any,
+  model: async () => (await import("@/models/Payment")).default,
   modelName: "Payment",
   permissions: {
-    get: PERMISSIONS.FINANCE_VIEW,
+    get: PERMISSIONS.PAYMENTS_VIEW,
   },
   populateFields: [],
 });

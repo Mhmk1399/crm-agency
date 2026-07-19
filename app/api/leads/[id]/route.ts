@@ -2,11 +2,11 @@ import { createDetailHandlers } from "@/lib/route-handler";
 import { PERMISSIONS } from "@/lib/permissions";
 
 const handlers = createDetailHandlers({
-  model: async () => (await import("@/models/Lead")).default as any,
+  model: async () => (await import("@/models/Lead")).default,
   modelName: "Lead",
   permissions: {
-    get: PERMISSIONS.LEAD_VIEW,
-    update: PERMISSIONS.LEAD_UPDATE,
+    get: PERMISSIONS.LEADS_VIEW,
+    update: PERMISSIONS.LEADS_UPDATE,
   },
   populateFields: ["ownerId"],
 });

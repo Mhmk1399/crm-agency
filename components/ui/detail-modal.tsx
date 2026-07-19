@@ -45,9 +45,9 @@ function formatValue(field: DetailField): React.ReactNode {
       const tags = Array.isArray(v) ? v : String(v).split(",").filter(Boolean);
       if (tags.length === 0) return <span className="text-muted">—</span>;
       return (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex min-w-0 flex-wrap gap-1">
           {tags.map((t: string) => (
-            <span key={t} className="bg-muted-bg text-foreground rounded-full px-2.5 py-0.5 text-[12px] font-medium">{t}</span>
+            <span key={t} className="min-w-0 max-w-full break-words bg-muted-bg text-foreground rounded-full px-2.5 py-0.5 text-[12px] font-medium">{t}</span>
           ))}
         </div>
       );
@@ -56,29 +56,29 @@ function formatValue(field: DetailField): React.ReactNode {
       return `${v}%`;
     case "url":
       return (
-        <a href={String(v)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-[14px]">
+        <a href={String(v)} target="_blank" rel="noopener noreferrer" className="break-all text-primary hover:underline text-[14px]">
           {String(v).replace(/^https?:\/\//, "")}
         </a>
       );
     case "email":
       return (
-        <a href={`mailto:${v}`} className="text-primary hover:underline text-[14px]">
+        <a href={`mailto:${v}`} className="break-all text-primary hover:underline text-[14px]">
           {String(v)}
         </a>
       );
     default:
-      return <span className="text-[14px] text-foreground">{String(v)}</span>;
+      return <span className="break-words text-[14px] text-foreground">{String(v)}</span>;
   }
 }
 
 export default function DetailModal({ open, onClose, title, subtitle, fields }: DetailModalProps) {
   return (
     <Modal open={open} onClose={onClose} title={title} description={subtitle} size="lg">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 mt-2">
+      <div className="mt-2 grid min-w-0 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
         {fields.map((f) => (
-          <div key={f.label} className={f.colSpan === 2 ? "col-span-full" : ""}>
-            <p className="text-[12px] font-medium text-muted uppercase tracking-wider mb-1">{f.label}</p>
-            <div className="text-[14px] text-foreground">{formatValue(f)}</div>
+          <div key={f.label} className={`min-w-0 ${f.colSpan === 2 ? "col-span-full" : ""}`}>
+            <p className="mb-1 break-words text-[12px] font-medium text-muted uppercase tracking-wider">{f.label}</p>
+            <div className="min-w-0 text-[14px] text-foreground">{formatValue(f)}</div>
           </div>
         ))}
       </div>

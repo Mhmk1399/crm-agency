@@ -2,11 +2,11 @@ import { createCrudHandlers } from "@/lib/route-handler";
 import { PERMISSIONS } from "@/lib/permissions";
 
 const handlers = createCrudHandlers({
-  model: async () => (await import("@/models/TaskChecklist")).default as any,
+  model: async () => (await import("@/models/TaskChecklist")).default,
   modelName: "TaskChecklistItem",
   permissions: {
-    list: PERMISSIONS.TASK_CREATE,
-    create: PERMISSIONS.TASK_CREATE,
+    list: PERMISSIONS.TASK_CHECKLISTS_VIEW,
+    create: PERMISSIONS.TASK_CHECKLISTS_POST,
   },
   searchFields: ["title"],
   populateFields: [],

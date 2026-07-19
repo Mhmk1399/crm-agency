@@ -10,7 +10,9 @@ import StatusPicker, { type StatusOption } from "@/components/ui/status-picker";
 import type { ReportBadge } from "@/components/dashboard/report-badges";
 import type { FieldConfig } from "@/types/dynamic-form";
 import type { ColumnConfig, TableAction } from "@/types/dynamic-table";
-import toast from "react-hot-toast";
+import toast from "@/components/ui/toast";
+import { useSession } from "@/lib/use-session";
+import { buildPermission } from "@/lib/permissions";
 
 // --- Schema ---
 const schema = z.object({
@@ -125,6 +127,8 @@ function buildDetailFields(lead: Lead): DetailField[] {
 // --- Component ---
 export default function LeadsTab() {
   const crud = useCrud<Lead>({ endpoint: "leads", label: "Lead" });
+  const { can } = useSession();
+  const canUpdateLead = can(buildPermission("leads", "update"));
 
   const [viewLead, setViewLead] = useState<Lead | null>(null);
   const [statusLead, setStatusLead] = useState<Lead | null>(null);
@@ -140,6 +144,7 @@ export default function LeadsTab() {
           type="button"
           onClick={(e) => { e.stopPropagation(); setStatusLead(row); }}
           className="cursor-pointer"
+          disabled={!canUpdateLead}
         >
           <Badge variant={statusVariant[String(row.status)] ?? "default"}>
             {String(row.status).replace(/_/g, " ")}
@@ -157,10 +162,15 @@ export default function LeadsTab() {
         const overdue = d < new Date();
         return <span className={overdue ? "text-destructive font-medium" : ""}>{d.toLocaleDateString()}</span>;
       }},
-  ], []);
+  ], [canUpdateLead]);
 
   const handleStatusChange = useCallback(async (newStatus: string) => {
     if (!statusLead) return;
+    if (!canUpdateLead) {
+      toast.error("You do not have permission to update leads.");
+      setStatusLead(null);
+      return;
+    }
     setStatusLoading(true);
     const result = await crud.update(statusLead._id, { status: newStatus });
     setStatusLoading(false);
@@ -195,7 +205,7 @@ export default function LeadsTab() {
       }
       setStatusLead(null);
     }
-  }, [statusLead, crud]);
+  }, [statusLead, crud, canUpdateLead]);
 
   const extraActions: TableAction<Lead>[] = [
     {
@@ -259,6 +269,7 @@ export default function LeadsTab() {
         }}
         onDelete={(id) => crud.remove(id)}
         addLabel="+ New Lead"
+        accessResource="leads"
       />
 
       {/* View Detail Modal */}

@@ -5,7 +5,9 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 import { generateRequestId } from "@/lib/correlation";
 import { AuthenticationError, NotFoundError, ConflictError } from "@/lib/errors";
 import { decrypt } from "@/lib/auth";
-import { requirePermission, PERMISSIONS } from "@/lib/permissions";
+import { PERMISSIONS } from "@/lib/permissions";
+import { requirePermission } from "@/lib/permission-store";
+import { createDataScopeResolver, mergeDataScope } from "@/lib/data-scope";
 import { validateTransition } from "@/lib/state-machine";
 import { LEAD_TRANSITIONS } from "@/lib/transitions";
 import { createAuditLog } from "@/lib/audit";
@@ -19,13 +21,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!token) throw new AuthenticationError();
     const session = await decrypt(token);
     if (!session) throw new AuthenticationError();
-    requirePermission({ role: session.role, permission: PERMISSIONS.LEAD_CONVERT });
+    await requirePermission({ role: session.role, organisationId: session.organisationId, permission: PERMISSIONS.LEADS_UPDATE });
 
     await connectDB();
     const { id } = await params;
     const orgId = new mongoose.Types.ObjectId(session.organisationId);
+    const getDataScope = createDataScopeResolver(session);
 
-    const lead = await Lead.findOne({ _id: new mongoose.Types.ObjectId(id), organisationId: orgId });
+    const lead = await Lead.findOne(
+      mergeDataScope(
+        { _id: new mongoose.Types.ObjectId(id), organisationId: orgId },
+        await getDataScope("Lead")
+      )
+    );
     if (!lead) throw new NotFoundError("Lead", id);
 
     validateTransition(LEAD_TRANSITIONS, "Lead", lead.status, "won");
